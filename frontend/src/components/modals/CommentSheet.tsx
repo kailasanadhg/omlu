@@ -167,7 +167,7 @@ export function CommentSheet({
             placeholder="Add a comment..."
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            className="flex-1 text-sm bg-neutral-100 rounded-full px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-black"
+            className="flex-1 text-sm text-neutral-900 placeholder:text-neutral-400 bg-neutral-100 rounded-full px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-black"
           />
           <button
             type="submit"

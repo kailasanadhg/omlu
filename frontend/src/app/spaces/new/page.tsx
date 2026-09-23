@@ -149,7 +149,7 @@ export default function NewSpacePage() {
             placeholder="e.g. Goa Trip 2027, The Boys, Class 10B..."
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full text-sm bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
+            className="w-full text-sm text-neutral-900 placeholder:text-neutral-400 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
           />
         </div>
 
@@ -162,7 +162,7 @@ export default function NewSpacePage() {
             placeholder="What is this Space for?"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full text-sm bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all resize-none"
+            className="w-full text-sm text-neutral-900 placeholder:text-neutral-400 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all resize-none"
           />
         </div>
 

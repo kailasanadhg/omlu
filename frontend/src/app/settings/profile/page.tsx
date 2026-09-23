@@ -174,7 +174,7 @@ function EditProfileForm({ user }: { user: User }) {
             required
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full text-sm bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
+            className="w-full text-sm text-neutral-900 placeholder:text-neutral-400 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
           />
         </div>
 
@@ -190,7 +190,7 @@ function EditProfileForm({ user }: { user: User }) {
               autoCapitalize="none"
               value={username}
               onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())}
-              className="w-full text-sm bg-neutral-50 border border-neutral-200 rounded-xl pl-8 pr-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
+              className="w-full text-sm text-neutral-900 placeholder:text-neutral-400 bg-neutral-50 border border-neutral-200 rounded-xl pl-8 pr-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
             />
           </div>
         </div>
@@ -204,7 +204,7 @@ function EditProfileForm({ user }: { user: User }) {
             placeholder="Tell your Spaces a little about yourself..."
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            className="w-full text-sm bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all resize-none"
+            className="w-full text-sm text-neutral-900 placeholder:text-neutral-400 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all resize-none"
           />
         </div>
 
