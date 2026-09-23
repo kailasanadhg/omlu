@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="128" fill="#000000"/>
+  <circle cx="200" cy="230" r="90" fill="none" stroke="#ffffff" stroke-width="36"/>
+  <circle cx="312" cy="282" r="90" fill="none" stroke="#ffffff" stroke-width="36" stroke-opacity="0.85"/>
+  <text x="256" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="-1">omlu</text>
+</svg>
