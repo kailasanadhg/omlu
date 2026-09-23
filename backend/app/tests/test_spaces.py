@@ -80,3 +80,59 @@ async def test_space_lifecycle_and_invite(client: AsyncClient):
     # 8. Bob is no longer a member
     res_bob_check = await client.get(f"/api/v1/spaces/{space_id}", headers=bob_headers)
     assert res_bob_check.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_list_my_spaces(client: AsyncClient):
+    """
+    Regression test for GET /api/v1/spaces.
+    Ensures that the list endpoint correctly returns all spaces the
+    authenticated user belongs to — caught by removing the broken window
+    function from the original list_my_spaces query.
+    """
+    owner, owner_token = await create_user(client, "list_owner")
+    member, member_token = await create_user(client, "list_member")
+    outsider, outsider_token = await create_user(client, "list_outsider")
+
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+    member_headers = {"Authorization": f"Bearer {member_token}"}
+    outsider_headers = {"Authorization": f"Bearer {outsider_token}"}
+
+    # Owner creates two spaces
+    res_s1 = await client.post("/api/v1/spaces", json={"name": "Space Alpha"}, headers=owner_headers)
+    assert res_s1.status_code == 201
+    space1 = res_s1.json()
+
+    res_s2 = await client.post("/api/v1/spaces", json={"name": "Space Beta"}, headers=owner_headers)
+    assert res_s2.status_code == 201
+    space2 = res_s2.json()
+
+    # Owner's list must include both spaces immediately after creation
+    res_owner_list = await client.get("/api/v1/spaces", headers=owner_headers)
+    assert res_owner_list.status_code == 200
+    owner_spaces = res_owner_list.json()
+    assert len(owner_spaces) == 2
+    owner_space_ids = {s["id"] for s in owner_spaces}
+    assert space1["id"] in owner_space_ids
+    assert space2["id"] in owner_space_ids
+    for s in owner_spaces:
+        assert s["is_member"] is True
+        assert s["is_owner"] is True
+
+    # Member joins Space Alpha via invite
+    res_join = await client.post(f"/api/v1/spaces/join/{space1['invite_code']}", headers=member_headers)
+    assert res_join.status_code == 200
+
+    # Member's list must contain only Space Alpha
+    res_member_list = await client.get("/api/v1/spaces", headers=member_headers)
+    assert res_member_list.status_code == 200
+    member_spaces = res_member_list.json()
+    assert len(member_spaces) == 1
+    assert member_spaces[0]["id"] == space1["id"]
+    assert member_spaces[0]["is_member"] is True
+    assert member_spaces[0]["is_owner"] is False
+
+    # Outsider (no memberships) must get an empty list
+    res_outsider_list = await client.get("/api/v1/spaces", headers=outsider_headers)
+    assert res_outsider_list.status_code == 200
+    assert res_outsider_list.json() == []

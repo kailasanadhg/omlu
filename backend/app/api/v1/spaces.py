@@ -67,27 +67,26 @@ async def list_my_spaces(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Query spaces user is a member of
+    # Fetch the IDs of all spaces the current user belongs to, ordered newest first.
+    # Selecting only Space + the user's own membership role — no window function,
+    # no implicit cross-partition counting over the filtered set.
     stmt = (
-        select(
-            Space,
-            Membership.role,
-            func.count(func.distinct(Membership.id)).over(partition_by=Space.id).label("members_count")
-        )
+        select(Space, Membership.role)
         .join(Membership, Membership.space_id == Space.id)
         .where(Membership.user_id == current_user.id)
         .order_by(Space.created_at.desc())
     )
     res = await db.execute(stmt)
-    spaces_with_role = res.all()
+    rows = res.all()
 
     output = []
-    for row in spaces_with_role:
-        space = row[0]
-        # Count total members
+    for row in rows:
+        space, role = row[0], row[1]
+
+        # Count total members across all users for this space
         m_count_stmt = select(func.count(Membership.id)).where(Membership.space_id == space.id)
         mem_count_stmt = select(func.count(Memory.id)).where(Memory.space_id == space.id)
-        
+
         m_count = (await db.execute(m_count_stmt)).scalar_one() or 0
         mem_count = (await db.execute(mem_count_stmt)).scalar_one() or 0
 

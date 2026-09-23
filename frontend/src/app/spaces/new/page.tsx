@@ -2,19 +2,18 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { QRCodeSVG } from "qrcode.react";
-import { Copy, Check, ArrowRight, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { Space } from "@/types";
 import { Button } from "@/components/ui/Button";
 
 export default function NewSpacePage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [createdSpace, setCreatedSpace] = useState<Space | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,91 +33,15 @@ export default function NewSpacePage() {
           description: description.trim() || undefined,
         }),
       });
-      setCreatedSpace(space);
+      // Navigate directly into the new Space — it is now accessible
+      // from the main navigation and SpaceCircles on the home feed.
+      router.push(`/spaces/${space.id}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create Space";
       setError(message);
-    } finally {
       setIsLoading(false);
     }
   };
-
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const inviteUrl = createdSpace ? `${origin}/join/${createdSpace.invite_code}` : "";
-
-  const handleCopy = () => {
-    if (!inviteUrl) return;
-    navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  // SUCCESS STEP: "Your Space is ready." with big QR code
-  if (createdSpace) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-6rem)] px-5 py-8 max-w-sm mx-auto text-center animate-in fade-in">
-        <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">
-          omlu
-        </span>
-        <h1 className="text-3xl font-black text-neutral-900 tracking-tight mb-2">
-          Your Space is ready.
-        </h1>
-        <p className="text-xs text-neutral-500 mb-6">
-          Share this invite QR code or link with your group.
-        </p>
-
-        {/* QR Card */}
-        <div className="w-full bg-white rounded-3xl p-6 border-2 border-neutral-900 shadow-xl flex flex-col items-center mb-6">
-          <h2 className="text-lg font-black text-neutral-900 mb-1">
-            {createdSpace.name}
-          </h2>
-          <p className="text-[11px] text-neutral-500 mb-5">
-            Scan to join this Space on OMLU
-          </p>
-
-          <div className="p-3 bg-white rounded-2xl border border-neutral-200 mb-5">
-            <QRCodeSVG
-              value={inviteUrl}
-              size={180}
-              level="H"
-              includeMargin={false}
-              className="w-44 h-44"
-            />
-          </div>
-
-          <div className="w-full bg-neutral-100 rounded-xl px-3 py-2 text-xs font-mono text-neutral-700 truncate mb-4 select-all">
-            {inviteUrl}
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={handleCopy}
-            className="w-full gap-2 h-11 text-xs font-bold"
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4 text-green-600" />
-                <span>Copied to Clipboard!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4" />
-                <span>Copy Invite Link</span>
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Enter Space */}
-        <Link href={`/spaces/${createdSpace.id}`} className="w-full">
-          <Button variant="primary" size="lg" className="w-full gap-2 h-12 font-bold shadow-md">
-            <span>Enter Space</span>
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-        </Link>
-      </div>
-    );
-  }
 
   // CREATION FORM
   return (
