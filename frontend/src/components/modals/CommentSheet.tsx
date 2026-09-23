@@ -107,12 +107,12 @@ export function CommentSheet({
         {/* Comment List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-32 text-neutral-400 text-sm">
+            <div className="flex items-center justify-center h-32 text-neutral-600 text-sm">
               Loading comments...
             </div>
           ) : comments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center text-neutral-400">
-              <p className="text-sm font-medium text-neutral-600 mb-1">No comments yet</p>
+            <div className="flex flex-col items-center justify-center h-48 text-center text-neutral-500">
+              <p className="text-sm font-medium text-neutral-800 mb-1">No comments yet</p>
               <p className="text-xs">Start the conversation!</p>
             </div>
           ) : (
@@ -135,11 +135,11 @@ export function CommentSheet({
                       >
                         @{c.author_username}
                       </Link>
-                      <span className="text-[11px] text-neutral-400">
+                      <span className="text-[11px] text-neutral-500">
                         {formatRelativeTime(c.created_at)}
                       </span>
                     </div>
-                    <p className="text-sm text-neutral-800 break-words mt-0.5">{c.body}</p>
+                    <p className="text-sm text-neutral-900 break-words mt-0.5">{c.body}</p>
                   </div>
                 </div>
 

@@ -313,7 +313,7 @@ function LiveCameraView() {
 
   if (isLoadingSpace || isAuthLoading) {
     return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white/50 text-xs">
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white/80 text-xs">
         <div className="w-7 h-7 border-2 border-white/20 border-t-white rounded-full animate-spin mb-3" />
         <p>Opening camera...</p>
       </div>
@@ -374,7 +374,7 @@ function LiveCameraView() {
 
           {/* Camera Loading Spinner */}
           {!isCameraReady && !cameraError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/40 text-xs">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/75 text-xs">
               <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
               <span>Starting camera...</span>
             </div>
@@ -452,7 +452,7 @@ function LiveCameraView() {
           ) : statusType === "error" ? (
             <span className="text-red-400 animate-in fade-in">{statusMessage}</span>
           ) : (
-            <span className="text-white/50">{statusMessage}</span>
+            <span className="text-white/80">{statusMessage}</span>
           )}
         </div>
       </footer>
@@ -464,7 +464,7 @@ export default function CameraPage() {
   return (
     <Suspense
       fallback={
-        <div className="fixed inset-0 bg-black flex items-center justify-center text-white/50 text-xs">
+        <div className="fixed inset-0 bg-black flex items-center justify-center text-white/80 text-xs">
           Loading camera...
         </div>
       }

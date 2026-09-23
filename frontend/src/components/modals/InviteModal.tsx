@@ -53,14 +53,14 @@ export function InviteModal({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-full text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-full text-neutral-500 hover:text-black hover:bg-neutral-100 transition-colors"
           aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Brand */}
-        <span className="text-xs font-black tracking-widest text-neutral-400 uppercase mb-1">
+        <span className="text-xs font-black tracking-widest text-neutral-500 uppercase mb-1">
           omlu
         </span>
         <h3 className="text-xl font-black text-neutral-900 mb-1">{spaceName}</h3>
@@ -80,7 +80,7 @@ export function InviteModal({
         </div>
 
         {/* Invite URL box */}
-        <div className="w-full bg-neutral-100 rounded-xl px-3 py-2 text-xs font-mono text-neutral-600 truncate mb-4 select-all">
+        <div className="w-full bg-neutral-100 rounded-xl px-3 py-2 text-xs font-mono text-neutral-700 truncate mb-4 select-all">
           {inviteUrl}
         </div>
 

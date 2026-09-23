@@ -33,7 +33,7 @@ export default function ActivityPage() {
 
   if (isAuthLoading || (isLoading && user)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-400 text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-600 text-xs">
         <div className="animate-spin w-6 h-6 border-2 border-black border-t-transparent rounded-full mb-3" />
         <span>Loading activity...</span>
       </div>
@@ -87,12 +87,12 @@ export default function ActivityPage() {
                     >
                       @{act.actor_username}
                     </Link>
-                    <span className="text-neutral-600">
+                    <span className="text-neutral-700">
                       {isLike && "liked your memory"}
                       {isComment && (act.content || "commented on your memory")}
                       {isJoin && (act.content || "joined your Space")}
                     </span>
-                    <span className="text-neutral-400 block text-[10px] mt-0.5">
+                    <span className="text-neutral-500 block text-[10px] mt-0.5">
                       {formatRelativeTime(act.created_at)}
                     </span>
                   </div>

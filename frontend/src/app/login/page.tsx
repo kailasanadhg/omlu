@@ -91,7 +91,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3.5 text-neutral-400 hover:text-neutral-700 transition-colors p-1"
+              className="absolute right-3.5 text-neutral-500 hover:text-black transition-colors p-1"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -129,7 +129,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-400">Loading...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-600">Loading...</div>}>
       <LoginForm />
     </Suspense>
   );

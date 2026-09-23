@@ -2,10 +2,14 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
 export function TopBar() {
+  const pathname = usePathname();
   const { user } = useAuth();
+
+  if (pathname === "/camera") return null;
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-neutral-200">

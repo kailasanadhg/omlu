@@ -17,7 +17,7 @@ export function Carousel({ items, onDoubleTap }: CarouselProps) {
 
   if (!items || items.length === 0) {
     return (
-      <div className="w-full aspect-square bg-neutral-100 flex items-center justify-center text-neutral-400">
+      <div className="w-full aspect-square bg-neutral-100 flex items-center justify-center text-neutral-500 font-medium text-xs">
         No images
       </div>
     );

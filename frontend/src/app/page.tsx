@@ -47,7 +47,7 @@ export default function HomePage() {
 
   if (isAuthLoading || (isLoading && user)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-400 text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-600 text-xs">
         <div className="animate-spin w-6 h-6 border-2 border-black border-t-transparent rounded-full mb-3" />
         <span>Loading memories...</span>
       </div>

@@ -69,7 +69,7 @@ export default function SpaceDetailPage() {
 
   if (isAuthLoading || (isLoading && !space)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] text-neutral-400 text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[70vh] text-neutral-600 text-xs">
         <div className="animate-spin w-6 h-6 border-2 border-black border-t-transparent rounded-full mb-3" />
         <span>Entering Space...</span>
       </div>
@@ -106,7 +106,7 @@ export default function SpaceDetailPage() {
             className={`flex-1 h-full flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
               activeTab === "feed"
                 ? "border-black text-black"
-                : "border-transparent text-neutral-400 hover:text-neutral-700"
+                : "border-transparent text-neutral-500 hover:text-black"
             }`}
           >
             <ListFilter className="w-4 h-4" />
@@ -118,7 +118,7 @@ export default function SpaceDetailPage() {
             className={`flex-1 h-full flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
               activeTab === "grid"
                 ? "border-black text-black"
-                : "border-transparent text-neutral-400 hover:text-neutral-700"
+                : "border-transparent text-neutral-500 hover:text-black"
             }`}
           >
             <Grid className="w-4 h-4" />
@@ -130,7 +130,7 @@ export default function SpaceDetailPage() {
             className={`flex-1 h-full flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
               activeTab === "members"
                 ? "border-black text-black"
-                : "border-transparent text-neutral-400 hover:text-neutral-700"
+                : "border-transparent text-neutral-500 hover:text-black"
             }`}
           >
             <Users className="w-4 h-4" />

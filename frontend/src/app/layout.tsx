@@ -22,6 +22,7 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: "#000000",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
@@ -31,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="bg-neutral-50 text-neutral-900 antialiased min-h-screen flex flex-col font-sans selection:bg-neutral-200">
+      <body className="bg-neutral-50 text-neutral-900 antialiased min-h-screen flex flex-col font-sans selection:bg-neutral-200 selection:text-neutral-900">
         <AuthProvider>
           <TopBar />
           <main className="flex-1 w-full max-w-xl mx-auto pb-20 bg-white min-h-[calc(100vh-3.5rem)] shadow-xs">

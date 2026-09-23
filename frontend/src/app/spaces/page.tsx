@@ -33,7 +33,7 @@ export default function SpacesPage() {
 
   if (isAuthLoading || (isLoading && user)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-400 text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-600 text-xs">
         <div className="animate-spin w-6 h-6 border-2 border-black border-t-transparent rounded-full mb-3" />
         <span>Loading spaces...</span>
       </div>
@@ -48,7 +48,7 @@ export default function SpacesPage() {
           <h1 className="text-2xl font-black tracking-tight text-neutral-900">
             Your Spaces
           </h1>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-neutral-600">
             Private groups where you share collective memories
           </p>
         </div>
@@ -105,7 +105,7 @@ export default function SpacesPage() {
                       {space.members_count} {space.members_count === 1 ? "member" : "members"} · {space.memories_count} {space.memories_count === 1 ? "memory" : "memories"}
                     </span>
                     {space.description && (
-                      <span className="text-xs text-neutral-400 truncate mt-0.5">
+                      <span className="text-xs text-neutral-600 truncate mt-0.5">
                         {space.description}
                       </span>
                     )}

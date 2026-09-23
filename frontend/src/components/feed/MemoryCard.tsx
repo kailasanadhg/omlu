@@ -225,7 +225,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
               {note.can_delete && (
                 <button
                   onClick={() => handleDeleteNote(note.id)}
-                  className="text-neutral-300 hover:text-red-500 opacity-60 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
+                  className="text-neutral-400 hover:text-red-500 opacity-60 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
                   title="Delete note"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -284,7 +284,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
         )}
 
         {/* Memory Date */}
-        <p className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mt-1.5 pb-2">
+        <p className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider mt-1.5 pb-2">
           {formatMemoryDate(memory.memory_date)}
         </p>
       </div>

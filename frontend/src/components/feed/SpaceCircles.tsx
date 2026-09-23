@@ -39,7 +39,7 @@ export function SpaceCircles({ spaces }: SpaceCirclesProps) {
               className="flex flex-col items-center gap-1.5 shrink-0 group focus:outline-none"
             >
               <div className="w-16 h-16 rounded-full p-0.5 ring-2 ring-neutral-300 group-hover:ring-black transition-all">
-                <div className="w-full h-full rounded-full overflow-hidden bg-neutral-100 flex items-center justify-center text-neutral-800 font-bold text-sm">
+                <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center text-white font-bold text-sm">
                   {cover ? (
                     <img
                       src={cover}

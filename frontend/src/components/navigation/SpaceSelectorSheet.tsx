@@ -80,14 +80,14 @@ export function SpaceSelectorSheet({ isOpen, onClose }: SpaceSelectorSheetProps)
         {/* Space List */}
         <div className="flex-1 overflow-y-auto py-3 space-y-2">
           {isLoading ? (
-            <div className="py-12 flex flex-col items-center justify-center text-neutral-400 gap-2">
+            <div className="py-12 flex flex-col items-center justify-center text-neutral-600 gap-2">
               <div className="w-6 h-6 border-2 border-neutral-300 border-t-black rounded-full animate-spin" />
               <p className="text-xs font-medium">Loading spaces...</p>
             </div>
           ) : spaces.length === 0 ? (
-            <div className="py-8 text-center text-neutral-500 space-y-2">
-              <p className="text-sm font-medium">You haven&apos;t joined any Spaces yet</p>
-              <p className="text-xs text-neutral-400">Create a space to start capturing live moments</p>
+            <div className="py-8 text-center text-neutral-600 space-y-2">
+              <p className="text-sm font-medium text-neutral-800">You haven&apos;t joined any Spaces yet</p>
+              <p className="text-xs text-neutral-500">Create a space to start capturing live moments</p>
             </div>
           ) : (
             spaces.map((space) => (

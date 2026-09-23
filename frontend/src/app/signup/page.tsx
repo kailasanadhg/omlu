@@ -92,7 +92,7 @@ function SignupForm() {
             Username
           </label>
           <div className="relative flex items-center">
-            <span className="absolute left-4 text-sm font-bold text-neutral-400">@</span>
+            <span className="absolute left-4 text-sm font-bold text-neutral-500">@</span>
             <input
               type="text"
               required
@@ -103,7 +103,7 @@ function SignupForm() {
               className="w-full text-sm text-neutral-900 placeholder:text-neutral-400 bg-neutral-50 border border-neutral-200 rounded-xl pl-8 pr-4 py-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black transition-all"
             />
           </div>
-          <p className="text-[10px] text-neutral-400 mt-1">
+          <p className="text-[10px] text-neutral-500 mt-1">
             Letters, numbers, and underscores only.
           </p>
         </div>
@@ -140,7 +140,7 @@ function SignupForm() {
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3.5 text-neutral-400 hover:text-neutral-700 transition-colors p-1"
+              className="absolute right-3.5 text-neutral-500 hover:text-black transition-colors p-1"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -178,7 +178,7 @@ function SignupForm() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-400">Loading...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-600">Loading...</div>}>
       <SignupForm />
     </Suspense>
   );

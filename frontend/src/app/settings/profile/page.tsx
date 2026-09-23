@@ -183,7 +183,7 @@ function EditProfileForm({ user }: { user: User }) {
             Username
           </label>
           <div className="relative flex items-center">
-            <span className="absolute left-4 text-sm font-bold text-neutral-400">@</span>
+            <span className="absolute left-4 text-sm font-bold text-neutral-500">@</span>
             <input
               type="text"
               required
@@ -234,7 +234,7 @@ export default function EditProfilePage() {
 
   if (isAuthLoading || !user) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-400 text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-600 text-xs">
         <div className="animate-spin w-6 h-6 border-2 border-black border-t-transparent rounded-full mb-3" />
         <span>Loading...</span>
       </div>

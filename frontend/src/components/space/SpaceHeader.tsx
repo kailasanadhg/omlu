@@ -31,7 +31,7 @@ export function SpaceHeader({ space }: SpaceHeaderProps) {
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-neutral-800 to-black flex items-center justify-center">
-            <span className="text-4xl font-black text-white/30 tracking-tight">
+            <span className="text-4xl font-black text-white/75 tracking-tight">
               {space.name.slice(0, 2).toUpperCase()}
             </span>
           </div>
@@ -45,12 +45,12 @@ export function SpaceHeader({ space }: SpaceHeaderProps) {
         </h1>
 
         {space.description && (
-          <p className="text-xs text-neutral-600 mb-3 whitespace-pre-line leading-relaxed">
+          <p className="text-xs text-neutral-700 mb-3 whitespace-pre-line leading-relaxed">
             {space.description}
           </p>
         )}
 
-        <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500 mb-4">
+        <div className="flex items-center gap-2 text-xs font-semibold text-neutral-600 mb-4">
           <span>{space.members_count} {space.members_count === 1 ? "member" : "members"}</span>
           <span>·</span>
           <span>{space.memories_count} {space.memories_count === 1 ? "memory" : "memories"}</span>

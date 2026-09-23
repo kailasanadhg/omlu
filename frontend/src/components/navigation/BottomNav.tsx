@@ -31,7 +31,7 @@ export function BottomNav() {
           <Link
             href="/"
             className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-colors ${
-              isHome ? "text-black" : "text-neutral-400 hover:text-neutral-600"
+              isHome ? "text-black" : "text-neutral-500 hover:text-black"
             }`}
             aria-label="Home Feed"
           >
@@ -42,7 +42,7 @@ export function BottomNav() {
           <Link
             href="/spaces"
             className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-colors ${
-              isSpaces ? "text-black" : "text-neutral-400 hover:text-neutral-600"
+              isSpaces ? "text-black" : "text-neutral-500 hover:text-black"
             }`}
             aria-label="Spaces"
           >
@@ -62,7 +62,7 @@ export function BottomNav() {
         <Link
           href="/activity"
           className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-colors ${
-            isActivity ? "text-black" : "text-neutral-400 hover:text-neutral-600"
+            isActivity ? "text-black" : "text-neutral-500 hover:text-black"
           }`}
           aria-label="Activity"
         >

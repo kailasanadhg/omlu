@@ -57,7 +57,7 @@ export default function NewSpacePage() {
   if (createdSpace) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-6rem)] px-5 py-8 max-w-sm mx-auto text-center animate-in fade-in">
-        <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-1">
+        <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">
           omlu
         </span>
         <h1 className="text-3xl font-black text-neutral-900 tracking-tight mb-2">
@@ -86,7 +86,7 @@ export default function NewSpacePage() {
             />
           </div>
 
-          <div className="w-full bg-neutral-100 rounded-xl px-3 py-2 text-xs font-mono text-neutral-600 truncate mb-4 select-all">
+          <div className="w-full bg-neutral-100 rounded-xl px-3 py-2 text-xs font-mono text-neutral-700 truncate mb-4 select-all">
             {inviteUrl}
           </div>
 
@@ -166,7 +166,7 @@ export default function NewSpacePage() {
           />
         </div>
 
-        <p className="text-xs text-neutral-400 leading-relaxed">
+        <p className="text-xs text-neutral-600 leading-relaxed">
           All Spaces on OMLU are private and invite-only. Anyone with the invite link or QR code can join.
         </p>
 

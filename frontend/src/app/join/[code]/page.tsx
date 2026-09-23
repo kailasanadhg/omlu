@@ -61,7 +61,7 @@ export default function JoinSpacePage() {
 
   if (isLoading || isAuthLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] text-neutral-400 text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[70vh] text-neutral-600 text-xs">
         <div className="animate-spin w-6 h-6 border-2 border-black border-t-transparent rounded-full mb-3" />
         <span>Loading Space invite...</span>
       </div>
@@ -105,7 +105,7 @@ export default function JoinSpacePage() {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-tr from-neutral-800 to-black flex items-center justify-center text-white/30 font-black text-3xl">
+            <div className="w-full h-full bg-gradient-to-tr from-neutral-800 to-black flex items-center justify-center text-white/75 font-black text-3xl">
               {preview.name.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -129,7 +129,7 @@ export default function JoinSpacePage() {
             <span>{preview.memories_count} {preview.memories_count === 1 ? "memory" : "memories"}</span>
           </div>
 
-          <p className="text-xs italic text-neutral-400 font-medium mb-6">
+          <p className="text-xs italic text-neutral-500 font-medium mb-6">
             Our Memories Link Us.
           </p>
 
@@ -146,7 +146,7 @@ export default function JoinSpacePage() {
       </div>
 
       {!user && (
-        <p className="text-xs text-neutral-400 text-center">
+        <p className="text-xs text-neutral-600 text-center">
           You&apos;ll be asked to create an account or log in, then brought straight into this Space.
         </p>
       )}

@@ -62,7 +62,7 @@ export default function UserProfilePage() {
 
   if (isAuthLoading || (isLoading && !profile)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-400 text-xs">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-600 text-xs">
         <div className="animate-spin w-6 h-6 border-2 border-black border-t-transparent rounded-full mb-3" />
         <span>Loading profile...</span>
       </div>
@@ -99,7 +99,7 @@ export default function UserProfilePage() {
             <h1 className="text-xl font-black text-neutral-900 truncate">
               {profile.display_name}
             </h1>
-            <p className="text-xs font-semibold text-neutral-500">
+            <p className="text-xs font-semibold text-neutral-600">
               @{profile.username}
             </p>
 
@@ -107,13 +107,13 @@ export default function UserProfilePage() {
             <div className="flex items-center gap-4 mt-3 text-xs">
               <div>
                 <span className="font-bold text-neutral-900">{profile.memories_count}</span>{" "}
-                <span className="text-neutral-500">
+                <span className="text-neutral-600">
                   {profile.is_self ? "memories" : "shared memories"}
                 </span>
               </div>
               <div>
                 <span className="font-bold text-neutral-900">{profile.spaces_count}</span>{" "}
-                <span className="text-neutral-500">
+                <span className="text-neutral-600">
                   {profile.is_self ? "spaces" : "shared spaces"}
                 </span>
               </div>
@@ -150,8 +150,8 @@ export default function UserProfilePage() {
           </div>
         ) : (
           !profile.is_self && profile.spaces_count === 0 && (
-            <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-500 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-neutral-400 shrink-0" />
+            <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-700 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-neutral-500 shrink-0" />
               <span>
                 You do not share any private Spaces with @{profile.username}.
               </span>
