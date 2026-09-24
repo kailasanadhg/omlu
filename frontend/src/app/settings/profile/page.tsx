@@ -8,8 +8,8 @@ import { apiRequest } from "@/lib/api";
 import { User, CloudinarySignature } from "@/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
-import { processImageForUpload } from "@/lib/imageUtils";
 import { uploadDirectToCloudinary } from "@/lib/cloudinary";
+import { AvatarCropModal } from "@/components/modals/AvatarCropModal";
 
 function EditProfileForm({ user }: { user: User }) {
   const router = useRouter();
@@ -19,6 +19,8 @@ function EditProfileForm({ user }: { user: User }) {
   const [username, setUsername] = useState(user.username || "");
   const [bio, setBio] = useState(user.bio || "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatar_url || null);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string | null>(null);
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +28,7 @@ function EditProfileForm({ user }: { user: User }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
     if (!file.type.startsWith("image/")) {
@@ -34,14 +36,21 @@ function EditProfileForm({ user }: { user: User }) {
       return;
     }
 
+    const objectUrl = URL.createObjectURL(file);
+    setSelectedImageSrc(objectUrl);
+    setIsCropModalOpen(true);
+    setError("");
+
+    // Reset input so re-selecting same file works
+    e.target.value = "";
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
     setIsUploadingAvatar(true);
     setError("");
 
     try {
-      // 1. Process image on canvas
-      const processed = await processImageForUpload(file, 800, 0.9);
-
-      // 2. Request signature for avatar upload
+      // 1. Request signature for avatar upload
       const signatureData = await apiRequest<CloudinarySignature>(
         "/media/cloudinary-sign",
         {
@@ -50,14 +59,29 @@ function EditProfileForm({ user }: { user: User }) {
         }
       );
 
-      // 3. Upload directly to Cloudinary
-      const res = await uploadDirectToCloudinary(processed.blob, signatureData);
+      // 2. Upload cropped avatar directly to Cloudinary
+      const res = await uploadDirectToCloudinary(croppedBlob, signatureData);
       setAvatarUrl(res.secure_url);
+      setIsCropModalOpen(false);
+
+      if (selectedImageSrc) {
+        URL.revokeObjectURL(selectedImageSrc);
+        setSelectedImageSrc(null);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to upload avatar";
       setError(message);
     } finally {
       setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleCloseCropModal = () => {
+    if (isUploadingAvatar) return;
+    setIsCropModalOpen(false);
+    if (selectedImageSrc) {
+      URL.revokeObjectURL(selectedImageSrc);
+      setSelectedImageSrc(null);
     }
   };
 
@@ -149,13 +173,27 @@ function EditProfileForm({ user }: { user: User }) {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-xs font-bold text-neutral-900 mt-2 hover:underline"
-          >
-            Change Photo
-          </button>
+          <div className="flex items-center gap-3 mt-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-xs font-bold text-neutral-900 hover:underline cursor-pointer"
+            >
+              Change Photo
+            </button>
+            {avatarUrl && (
+              <>
+                <span className="text-neutral-300">·</span>
+                <button
+                  type="button"
+                  onClick={() => setAvatarUrl(null)}
+                  className="text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+                >
+                  Remove Photo
+                </button>
+              </>
+            )}
+          </div>
           <input
             type="file"
             ref={fileInputRef}
@@ -164,6 +202,14 @@ function EditProfileForm({ user }: { user: User }) {
             className="hidden"
           />
         </div>
+
+        <AvatarCropModal
+          isOpen={isCropModalOpen}
+          imageSrc={selectedImageSrc}
+          onClose={handleCloseCropModal}
+          onCropComplete={handleCropComplete}
+          isUploading={isUploadingAvatar}
+        />
 
         <div>
           <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
