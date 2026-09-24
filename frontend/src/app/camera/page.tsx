@@ -93,7 +93,14 @@ function LiveCameraView() {
 
       if (failed) {
         setStatusType("error");
-        setStatusMessage(failed.errorMessage || "Upload failed. Tap to retry.");
+        const safeMessage =
+          failed.errorMessage &&
+          !failed.errorMessage.includes("String to sign") &&
+          !failed.errorMessage.includes("signature") &&
+          !failed.errorMessage.includes("cloudinary")
+            ? failed.errorMessage
+            : "Upload failed. Tap to retry.";
+        setStatusMessage(safeMessage);
         setFailedDropId(failed.id);
       } else if (active.length > 0) {
         setStatusType("adding");

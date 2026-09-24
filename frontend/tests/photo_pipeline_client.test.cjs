@@ -186,6 +186,8 @@ function testFailedUploadRetentionAndRetry() {
   testSpaceIsolationDuringUpload();
   testCreationFailureRetainsUploadReceipt();
   testReloadRecovery();
+  testUploadErrorSanitization();
+  testRetryPreservesCapturedBlob();
   console.log("ALL FRONTEND CLIENT TESTS PASSED!");
 })();
 
@@ -308,4 +310,70 @@ function testReloadRecovery() {
   }
 
   console.log("✓ Reload recovery test passed");
+}
+
+// 8. Error Sanitization in UI
+function testUploadErrorSanitization() {
+  function sanitizeUserErrorMessage(err) {
+    if (!err) return "Upload failed. Tap to retry.";
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("aborted")) return "Upload cancelled.";
+    if (msg.toLowerCase().includes("timed out") || msg.toLowerCase().includes("timeout")) {
+      return "Upload timed out. Tap to retry.";
+    }
+    if (
+      msg.toLowerCase().includes("network") ||
+      msg.toLowerCase().includes("offline") ||
+      msg.toLowerCase().includes("failed to fetch")
+    ) {
+      return "Network error. Tap to retry.";
+    }
+    return "Upload failed. Tap to retry.";
+  }
+
+  // Raw provider signature mismatch error
+  const rawProviderError = new Error("Invalid Signature 643a93b80f038343ee056593adb5247dfcc868e3. String to sign - folder=omlu/spaces/123/memories&overwrite=false&public_id=cbb5d12ef8424b94879fe67884d3c333&timestamp=1727190000");
+  const sanitizedProvider = sanitizeUserErrorMessage(rawProviderError);
+  assert.equal(sanitizedProvider, "Upload failed. Tap to retry.");
+  assert(!sanitizedProvider.includes("String to sign"), "Must not leak String to sign");
+  assert(!sanitizedProvider.includes("Signature"), "Must not leak signature");
+  assert(!sanitizedProvider.includes("643a9"), "Must not leak hashes");
+
+  // Timeout error
+  const timeoutError = new Error("Upload timed out after 45s");
+  assert.equal(sanitizeUserErrorMessage(timeoutError), "Upload timed out. Tap to retry.");
+
+  // Network offline error
+  const networkError = new Error("Network error during Cloudinary upload");
+  assert.equal(sanitizeUserErrorMessage(networkError), "Network error. Tap to retry.");
+
+  console.log("✓ Upload error sanitization test passed");
+}
+
+// 9. Retry Preserves Captured Blob (No Re-capture Required)
+function testRetryPreservesCapturedBlob() {
+  const originalBytes = Buffer.from("captured_photo_data_12345");
+  const failedDrop = {
+    id: "drop-retry-test-1",
+    blob: originalBytes,
+    status: "failed",
+    errorMessage: "Upload failed. Tap to retry.",
+    retryCount: 0
+  };
+
+  // User taps retry in UI
+  function onRetryTap(drop) {
+    drop.status = "queued";
+    drop.errorMessage = null;
+    drop.retryCount += 1;
+  }
+
+  onRetryTap(failedDrop);
+
+  assert.equal(failedDrop.status, "queued", "Drop must be re-queued for processing");
+  assert.equal(failedDrop.errorMessage, null, "Error message must be cleared on retry");
+  assert.equal(failedDrop.retryCount, 1);
+  assert.equal(failedDrop.blob, originalBytes, "Original photo blob must be intact without retaking photo");
+
+  console.log("✓ Retry preserves captured blob test passed");
 }

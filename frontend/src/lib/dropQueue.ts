@@ -239,6 +239,31 @@ export function pendingDropToMemory(drop: PendingDrop): Memory {
   };
 }
 
+/**
+ * Sanitizes errors for safe user-facing display.
+ * Internal details, signatures, strings-to-sign, stack traces, and IDs are never exposed in UI.
+ */
+export function sanitizeUserErrorMessage(err: unknown): string {
+  if (!err) return "Upload failed. Tap to retry.";
+  const msg = err instanceof Error ? err.message : String(err);
+
+  if (msg.includes("aborted")) {
+    return "Upload cancelled.";
+  }
+  if (msg.toLowerCase().includes("timed out") || msg.toLowerCase().includes("timeout")) {
+    return "Upload timed out. Tap to retry.";
+  }
+  if (
+    msg.toLowerCase().includes("network") ||
+    msg.toLowerCase().includes("offline") ||
+    msg.toLowerCase().includes("failed to fetch")
+  ) {
+    return "Network error. Tap to retry.";
+  }
+
+  return "Upload failed. Tap to retry.";
+}
+
 // Background Queue Worker
 let isProcessingQueue = false;
 
@@ -258,10 +283,10 @@ export async function processQueue() {
         await processSingleDrop(drop);
       } catch (err: unknown) {
         console.error(`Failed to process drop ${drop.id}:`, err);
-        const errorMsg = err instanceof Error ? err.message : "Upload failed";
+        const safeErrorMsg = sanitizeUserErrorMessage(err);
         await updatePendingDrop(drop.id, {
           status: "failed",
-          errorMessage: errorMsg,
+          errorMessage: safeErrorMsg,
           lastAttemptAt: Date.now(),
         });
       }

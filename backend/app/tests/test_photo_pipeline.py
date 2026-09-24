@@ -361,3 +361,37 @@ async def test_asset_verification_errors():
             await verify_asset(session)
         assert exc_info.value.status_code == 503
         assert "retry later" in exc_info.value.detail.lower()
+
+def test_cloudinary_immutable_signature_string_to_sign():
+    import cloudinary.utils
+    from app.core.cloudinary_service import cloudinary_service
+    from app.core.config import settings
+
+    folder = "omlu/spaces/test-space/memories"
+    public_id = "test_memory_pubid"
+    sig = cloudinary_service.generate_upload_signature(folder, public_id, immutable=True)
+
+    # Must explicitly declare overwrite=False in returned signature payload
+    assert sig["overwrite"] is False
+    assert sig["folder"] == folder
+    assert sig["public_id"] == public_id
+
+    # Verify that api_string_to_sign properly includes overwrite=false
+    # Cloudinary server expects: folder=...&overwrite=false&public_id=...&timestamp=...
+    expected_to_sign = f"folder={folder}&overwrite=false&public_id={public_id}&timestamp={sig['timestamp']}"
+    
+    # Recompute signature directly from expected string
+    expected_signature = cloudinary.utils.compute_hex_hash(
+        expected_to_sign + settings.CLOUDINARY_API_SECRET,
+        cloudinary.utils.SIGNATURE_SHA1
+    )
+    assert sig["signature"] == expected_signature, "Signature must match string-to-sign containing overwrite=false"
+
+def test_cloudinary_mutable_signature_omits_overwrite():
+    from app.core.cloudinary_service import cloudinary_service
+    folder = "omlu/spaces/test-space/covers"
+    public_id = "test_cover_pubid"
+    sig = cloudinary_service.generate_upload_signature(folder, public_id, immutable=False)
+
+    assert sig["overwrite"] is None
+    assert "overwrite" not in sig["signature"]

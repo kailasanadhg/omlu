@@ -33,7 +33,10 @@ class CloudinaryService:
         }
         
         if immutable:
-            params_to_sign["overwrite"] = False
+            # Cloudinary Python SDK's api_string_to_sign skips falsy values (`if v:`),
+            # which drops boolean `False`. Passing string "false" ensures `overwrite=false`
+            # is properly included in the signed parameter string.
+            params_to_sign["overwrite"] = "false"
 
         signature = cloudinary.utils.api_sign_request(
             params_to_sign,
