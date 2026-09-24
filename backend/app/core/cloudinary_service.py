@@ -3,6 +3,7 @@ import uuid
 from typing import Dict, Any, Optional
 import cloudinary
 import cloudinary.uploader
+import cloudinary.api
 import cloudinary.utils
 from app.core.config import settings
 
@@ -16,13 +17,13 @@ cloudinary.config(
 
 class CloudinaryService:
     @staticmethod
-    def generate_upload_signature(folder: str) -> Dict[str, Any]:
+    def generate_upload_signature(folder: str, public_id: Optional[str] = None, immutable: bool = False) -> Dict[str, Any]:
         """
         Generates server-side signed parameters for direct browser-to-Cloudinary upload.
         CLOUDINARY_API_SECRET is kept strictly on the backend.
         """
         timestamp = int(time.time())
-        public_id = uuid.uuid4().hex
+        public_id = public_id or uuid.uuid4().hex
         
         # Parameters to include in Cloudinary signature
         params_to_sign = {
@@ -31,12 +32,16 @@ class CloudinaryService:
             "timestamp": timestamp,
         }
         
+        if immutable:
+            params_to_sign["overwrite"] = False
+
         signature = cloudinary.utils.api_sign_request(
             params_to_sign,
             settings.CLOUDINARY_API_SECRET
         )
         
         return {
+            "overwrite": False if immutable else None,
             "signature": signature,
             "timestamp": timestamp,
             "api_key": settings.CLOUDINARY_API_KEY,
@@ -45,6 +50,11 @@ class CloudinaryService:
             "public_id": public_id,
             "upload_url": f"https://api.cloudinary.com/v1_1/{settings.CLOUDINARY_CLOUD_NAME}/image/upload"
         }
+
+    @staticmethod
+    def get_asset(public_id: str) -> Dict[str, Any]:
+        # Admin API: authoritative metadata, not client-supplied upload fields.
+        return cloudinary.api.resource(public_id, resource_type="image", type="upload", timeout=20)
 
     @staticmethod
     def delete_asset(public_id: str) -> bool:

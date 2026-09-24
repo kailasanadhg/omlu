@@ -1,0 +1,32 @@
+{
+  "scope": "Exact source bodies; simulated dependency timing, no hardware or network measurements",
+  "results": [
+    {
+      "scenario": "stream resolves before conditional video mount",
+      "attached": false,
+      "ready": false
+    },
+    {
+      "scenario": "video mounted before stream resolves",
+      "attached": true,
+      "ready": true
+    },
+    {
+      "scenario": "two queued captures",
+      "calls": [
+        "/media/cloudinary-sign",
+        "upload",
+        "/memories",
+        "/media/cloudinary-sign",
+        "upload",
+        "/memories"
+      ],
+      "second_signature_waits_for_first_memory": true
+    },
+    {
+      "scenario": "upload rejects",
+      "remaining_queue_length": 0,
+      "failed_item_requeued": false
+    }
+  ]
+}

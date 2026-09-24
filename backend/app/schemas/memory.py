@@ -6,12 +6,14 @@ from app.schemas.media import MediaItemCreate, MediaItemOut
 from app.schemas.note import NoteOut
 
 class MemoryCreate(BaseModel):
+    client_id: Optional[uuid.UUID] = None
     space_id: uuid.UUID
     caption: Optional[str] = Field(None, max_length=2200)
     memory_date: Optional[date] = None
     media_items: List[MediaItemCreate] = Field(..., min_length=1, max_length=10)
 
 class MemoryOut(BaseModel):
+    client_id: Optional[uuid.UUID] = None
     id: uuid.UUID
     space_id: uuid.UUID
     space_name: str

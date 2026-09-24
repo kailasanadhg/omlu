@@ -1,4 +1,6 @@
 import uuid
+import hashlib
+import json
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,6 +14,8 @@ from app.models.space import Space
 from app.models.membership import Membership
 from app.models.memory import Memory
 from app.models.media import Media
+from app.models.upload_session import UploadSession
+from app.core.upload_sessions import lock_identity, verify_asset
 from app.models.like import Like
 from app.models.comment import Comment
 from app.models.note import Note
@@ -22,15 +26,19 @@ from app.api.deps import get_current_user
 
 router = APIRouter()
 
-async def format_memory_out(memory: Memory, current_user_id: uuid.UUID, space_owner_id: uuid.UUID, db: AsyncSession) -> MemoryOut:
-    # Likes count and is_liked_by_me
-    likes_count_stmt = select(func.count(Like.id)).where(Like.memory_id == memory.id)
-    is_liked_stmt = select(Like).where(Like.memory_id == memory.id, Like.user_id == current_user_id)
-    comments_count_stmt = select(func.count(Comment.id)).where(Comment.memory_id == memory.id)
+async def memory_stats(ids: list[uuid.UUID], current_user_id: uuid.UUID, db: AsyncSession) -> dict:
+    if not ids:
+        return {}
+    likes = dict((await db.execute(select(Like.memory_id, func.count(Like.id)).where(Like.memory_id.in_(ids)).group_by(Like.memory_id))).all())
+    liked = set((await db.execute(select(Like.memory_id).where(Like.memory_id.in_(ids), Like.user_id == current_user_id))).scalars())
+    comments = dict((await db.execute(select(Comment.memory_id, func.count(Comment.id)).where(Comment.memory_id.in_(ids)).group_by(Comment.memory_id))).all())
+    return {id: (likes.get(id, 0), id in liked, comments.get(id, 0)) for id in ids}
 
-    likes_count = (await db.execute(likes_count_stmt)).scalar_one() or 0
-    is_liked = (await db.execute(is_liked_stmt)).scalar_one_or_none() is not None
-    comments_count = (await db.execute(comments_count_stmt)).scalar_one() or 0
+
+async def format_memory_out(memory: Memory, current_user_id: uuid.UUID, space_owner_id: uuid.UUID, db: AsyncSession, stats: Optional[dict] = None) -> MemoryOut:
+    if stats is None:
+        stats = await memory_stats([memory.id], current_user_id, db)
+    likes_count, is_liked, comments_count = stats[memory.id]
 
     can_delete = (memory.author_id == current_user_id) or (space_owner_id == current_user_id)
 
@@ -65,6 +73,7 @@ async def format_memory_out(memory: Memory, current_user_id: uuid.UUID, space_ow
 
     return MemoryOut(
         id=memory.id,
+        client_id=memory.client_id,
         space_id=memory.space_id,
         space_name=memory.space.name,
         author_id=memory.author_id,
@@ -112,32 +121,108 @@ async def create_memory(
             detail="A Memory must contain between 1 and 10 photos"
         )
 
-    # Create memory atomically
-    memory = Memory(
-        author_id=current_user.id,
-        space_id=space.id,
-        caption=payload.caption.strip() if payload.caption else None,
-        memory_date=payload.memory_date or datetime.now(timezone.utc).date()
-    )
-    db.add(memory)
-    await db.flush()
+    uploads_repr = [
+        str(item.upload_session_id) if item.upload_session_id else f"{item.cloudinary_public_id}:{item.secure_url}"
+        for item in payload.media_items
+    ]
+    identity = {
+        "space_id": str(payload.space_id),
+        "caption": payload.caption.strip() if payload.caption else None,
+        "memory_date": str(payload.memory_date) if payload.memory_date else None,
+        "uploads": uploads_repr
+    }
+    request_hash = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
-    for idx, item in enumerate(payload.media_items):
-        media = Media(
-            memory_id=memory.id,
-            cloudinary_public_id=item.cloudinary_public_id,
-            cloudinary_asset_id=item.cloudinary_asset_id,
-            secure_url=item.secure_url,
-            resource_type=item.resource_type or "image",
-            format=item.format,
-            width=item.width,
-            height=item.height,
-            bytes=item.bytes,
-            position=idx
+    memory = None
+    if payload.client_id:
+        await lock_identity(db, f"memory:{current_user.id}:{payload.client_id}")
+        memory = await db.scalar(
+            select(Memory).where(
+                Memory.author_id == current_user.id,
+                Memory.client_id == payload.client_id
+            )
         )
-        db.add(media)
+        if memory:
+            if memory.request_hash != request_hash:
+                raise HTTPException(status.HTTP_409_CONFLICT, "client_id was already used with different content")
 
-    await db.commit()
+    if memory is None:
+        has_upload_sessions = any(item.upload_session_id is not None for item in payload.media_items)
+        if has_upload_sessions:
+            ids = [item.upload_session_id for item in payload.media_items]
+            if any(u_id is None for u_id in ids):
+                raise HTTPException(422, "All photos must provide an upload session")
+            if len(set(ids)) != len(ids):
+                raise HTTPException(422, "Each photo needs a distinct upload session")
+            sessions = (
+                await db.execute(
+                    select(UploadSession)
+                    .where(UploadSession.id.in_(ids))
+                    .order_by(UploadSession.id)
+                    .with_for_update()
+                )
+            ).scalars().all()
+            if len(sessions) != len(ids) or any(u.user_id != current_user.id or u.space_id != space.id for u in sessions):
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "Media was not authorized for this user and Space")
+            if any(u.memory_id for u in sessions):
+                raise HTTPException(status.HTTP_409_CONFLICT, "Media is already attached to another memory")
+            assets = {u.id: await verify_asset(u) for u in sessions}
+            memory = Memory(
+                author_id=current_user.id,
+                space_id=space.id,
+                client_id=payload.client_id,
+                request_hash=request_hash,
+                caption=identity["caption"],
+                memory_date=payload.memory_date or datetime.now(timezone.utc).date()
+            )
+            db.add(memory)
+            await db.flush()
+            for idx, upload_id in enumerate(ids):
+                asset = assets[upload_id]
+                db.add(
+                    Media(
+                        memory_id=memory.id,
+                        cloudinary_public_id=asset["public_id"],
+                        cloudinary_asset_id=asset.get("asset_id"),
+                        secure_url=asset["secure_url"],
+                        resource_type=asset.get("resource_type", "image"),
+                        format=asset.get("format"),
+                        width=asset.get("width"),
+                        height=asset.get("height"),
+                        bytes=asset.get("bytes"),
+                        position=idx
+                    )
+                )
+            for session in sessions:
+                session.memory_id = memory.id
+            await db.commit()
+        else:
+            memory = Memory(
+                author_id=current_user.id,
+                space_id=space.id,
+                client_id=payload.client_id,
+                request_hash=request_hash,
+                caption=identity["caption"],
+                memory_date=payload.memory_date or datetime.now(timezone.utc).date()
+            )
+            db.add(memory)
+            await db.flush()
+            for idx, item in enumerate(payload.media_items):
+                db.add(
+                    Media(
+                        memory_id=memory.id,
+                        cloudinary_public_id=item.cloudinary_public_id or "",
+                        cloudinary_asset_id=item.cloudinary_asset_id,
+                        secure_url=item.secure_url or "",
+                        resource_type=item.resource_type or "image",
+                        format=item.format,
+                        width=item.width,
+                        height=item.height,
+                        bytes=item.bytes,
+                        position=idx
+                    )
+                )
+            await db.commit()
 
     # Re-query with eager loading
     stmt = (
@@ -177,9 +262,10 @@ async def get_home_feed(
     )
     results = (await db.execute(stmt)).all()
 
+    stats = await memory_stats([m.id for m, _ in results], current_user.id, db)
     memories_out = []
     for memory, owner_id in results:
-        memories_out.append(await format_memory_out(memory, current_user.id, owner_id, db))
+        memories_out.append(await format_memory_out(memory, current_user.id, owner_id, db, stats))
     return memories_out
 
 @router.get("/space/{space_id}", response_model=List[MemoryOut])
@@ -219,7 +305,8 @@ async def get_space_memories(
     )
     memories = (await db.execute(stmt)).scalars().all()
 
-    return [await format_memory_out(m, current_user.id, space.owner_id, db) for m in memories]
+    stats = await memory_stats([m.id for m in memories], current_user.id, db)
+    return [await format_memory_out(m, current_user.id, space.owner_id, db, stats) for m in memories]
 
 @router.get("/user/{user_id}", response_model=List[MemoryOut])
 async def get_user_memories(
@@ -272,7 +359,16 @@ async def get_user_memories(
         )
 
     results = (await db.execute(stmt)).all()
-    return [await format_memory_out(m, current_user.id, owner_id, db) for m, owner_id in results]
+    stats = await memory_stats([m.id for m, _ in results], current_user.id, db)
+    return [await format_memory_out(m, current_user.id, owner_id, db, stats) for m, owner_id in results]
+
+@router.get("/by-client/{client_id}", response_model=MemoryOut)
+async def get_memory_by_client(client_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    memory_id = await db.scalar(select(Memory.id).where(Memory.author_id == current_user.id, Memory.client_id == client_id))
+    if not memory_id:
+        raise HTTPException(404, "Memory not found")
+    return await get_memory_detail(memory_id, current_user, db)
+
 
 @router.get("/{memory_id}", response_model=MemoryOut)
 async def get_memory_detail(

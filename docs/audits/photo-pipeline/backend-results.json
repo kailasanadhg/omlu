@@ -1,0 +1,234 @@
+{
+  "scope": "Local ASGI + real PostgreSQL isolated transactional schema. No network upload. Commit uses savepoints, not durable fsync.",
+  "schema_rolled_back": true,
+  "identical_create_requests": 5,
+  "distinct_memory_ids": 5,
+  "summary": {
+    "signature": {
+      "n": 5,
+      "median_ms": 1.908,
+      "min_ms": 1.769,
+      "max_ms": 9.03,
+      "selects": 2,
+      "inserts": 0
+    },
+    "create": {
+      "n": 5,
+      "median_ms": 6.478,
+      "min_ms": 5.818,
+      "max_ms": 18.997,
+      "selects": 11,
+      "inserts": 2
+    },
+    "space_feed_5": {
+      "n": 3,
+      "median_ms": 8.427,
+      "min_ms": 7.188,
+      "max_ms": 18.07,
+      "selects": 23,
+      "inserts": 0
+    },
+    "space_feed_100": {
+      "n": 3,
+      "median_ms": 55.288,
+      "min_ms": 44.248,
+      "max_ms": 59.333,
+      "selects": 308,
+      "inserts": 0
+    },
+    "home_feed_50": {
+      "n": 3,
+      "median_ms": 26.901,
+      "min_ms": 22.466,
+      "max_ms": 34.79,
+      "selects": 156,
+      "inserts": 0
+    },
+    "space_details": {
+      "n": 1,
+      "median_ms": 5.507,
+      "min_ms": 5.507,
+      "max_ms": 5.507,
+      "selects": 5,
+      "inserts": 0
+    },
+    "space_members": {
+      "n": 1,
+      "median_ms": 1.906,
+      "min_ms": 1.906,
+      "max_ms": 1.906,
+      "selects": 3,
+      "inserts": 0
+    }
+  },
+  "samples": [
+    {
+      "stage": "signature",
+      "ms": 9.03,
+      "status": 200,
+      "selects": 2,
+      "inserts": 0,
+      "sql_ms": 1.338
+    },
+    {
+      "stage": "signature",
+      "ms": 2.036,
+      "status": 200,
+      "selects": 2,
+      "inserts": 0,
+      "sql_ms": 0.909
+    },
+    {
+      "stage": "signature",
+      "ms": 1.908,
+      "status": 200,
+      "selects": 2,
+      "inserts": 0,
+      "sql_ms": 0.945
+    },
+    {
+      "stage": "signature",
+      "ms": 1.769,
+      "status": 200,
+      "selects": 2,
+      "inserts": 0,
+      "sql_ms": 0.662
+    },
+    {
+      "stage": "signature",
+      "ms": 1.828,
+      "status": 200,
+      "selects": 2,
+      "inserts": 0,
+      "sql_ms": 0.875
+    },
+    {
+      "stage": "create",
+      "ms": 18.997,
+      "status": 201,
+      "selects": 11,
+      "inserts": 2,
+      "sql_ms": 9.043
+    },
+    {
+      "stage": "create",
+      "ms": 6.545,
+      "status": 201,
+      "selects": 11,
+      "inserts": 2,
+      "sql_ms": 3.655
+    },
+    {
+      "stage": "create",
+      "ms": 6.478,
+      "status": 201,
+      "selects": 11,
+      "inserts": 2,
+      "sql_ms": 3.92
+    },
+    {
+      "stage": "create",
+      "ms": 5.818,
+      "status": 201,
+      "selects": 11,
+      "inserts": 2,
+      "sql_ms": 3.523
+    },
+    {
+      "stage": "create",
+      "ms": 5.935,
+      "status": 201,
+      "selects": 11,
+      "inserts": 2,
+      "sql_ms": 3.666
+    },
+    {
+      "stage": "space_feed_5",
+      "ms": 8.427,
+      "status": 200,
+      "selects": 23,
+      "inserts": 0,
+      "sql_ms": 4.832
+    },
+    {
+      "stage": "space_feed_5",
+      "ms": 7.188,
+      "status": 200,
+      "selects": 23,
+      "inserts": 0,
+      "sql_ms": 3.809
+    },
+    {
+      "stage": "space_feed_5",
+      "ms": 18.07,
+      "status": 200,
+      "selects": 23,
+      "inserts": 0,
+      "sql_ms": 3.591
+    },
+    {
+      "stage": "space_feed_100",
+      "ms": 59.333,
+      "status": 200,
+      "selects": 308,
+      "inserts": 0,
+      "sql_ms": 33.97
+    },
+    {
+      "stage": "home_feed_50",
+      "ms": 34.79,
+      "status": 200,
+      "selects": 156,
+      "inserts": 0,
+      "sql_ms": 20.251
+    },
+    {
+      "stage": "space_feed_100",
+      "ms": 55.288,
+      "status": 200,
+      "selects": 308,
+      "inserts": 0,
+      "sql_ms": 29.674
+    },
+    {
+      "stage": "home_feed_50",
+      "ms": 26.901,
+      "status": 200,
+      "selects": 156,
+      "inserts": 0,
+      "sql_ms": 13.277
+    },
+    {
+      "stage": "space_feed_100",
+      "ms": 44.248,
+      "status": 200,
+      "selects": 308,
+      "inserts": 0,
+      "sql_ms": 19.743
+    },
+    {
+      "stage": "home_feed_50",
+      "ms": 22.466,
+      "status": 200,
+      "selects": 156,
+      "inserts": 0,
+      "sql_ms": 9.226
+    },
+    {
+      "stage": "space_details",
+      "ms": 5.507,
+      "status": 200,
+      "selects": 5,
+      "inserts": 0,
+      "sql_ms": 0.717
+    },
+    {
+      "stage": "space_members",
+      "ms": 1.906,
+      "status": 200,
+      "selects": 3,
+      "inserts": 0,
+      "sql_ms": 0.584
+    }
+  ]
+}

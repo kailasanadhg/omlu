@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Sparkles, Grid, ListFilter, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -11,6 +11,14 @@ import { MemoriesGrid } from "@/components/space/MemoriesGrid";
 import { MembersList } from "@/components/space/MembersList";
 import { MemoryCard } from "@/components/feed/MemoryCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  PendingDrop,
+  getPendingDropsForSpace,
+  subscribeToPendingDrops,
+  subscribeToDropReconciliation,
+  pendingDropToMemory,
+  initDropQueue,
+} from "@/lib/dropQueue";
 
 export default function SpaceDetailPage() {
   const params = useParams();
@@ -19,7 +27,8 @@ export default function SpaceDetailPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
 
   const [space, setSpace] = useState<Space | null>(null);
-  const [memories, setMemories] = useState<Memory[]>([]);
+  const [serverMemories, setServerMemories] = useState<Memory[]>([]);
+  const [pendingDrops, setPendingDrops] = useState<PendingDrop[]>([]);
   const [members, setMembers] = useState<SpaceMember[]>([]);
   const [activeTab, setActiveTab] = useState<"feed" | "grid" | "members">("feed");
   const [isLoading, setIsLoading] = useState(true);
@@ -33,21 +42,59 @@ export default function SpaceDetailPage() {
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Initialize drop queue and load initial pending drops for this space
+  useEffect(() => {
+    if (!user || !spaceId) return;
+
+    initDropQueue(user.id).then(() => {
+      getPendingDropsForSpace(user.id, spaceId).then(setPendingDrops);
+    });
+
+    const unsubscribeDrops = subscribeToPendingDrops((allDrops) => {
+      const spaceDrops = allDrops.filter(
+        (d) => d.userId === user.id && d.spaceId === spaceId && d.status !== "confirmed"
+      );
+      setPendingDrops(spaceDrops);
+    });
+
+    const unsubscribeReconcile = subscribeToDropReconciliation((canonical) => {
+      if (canonical.space_id === spaceId) {
+        setServerMemories((prev) => {
+          const exists = prev.some(
+            (m) => m.id === canonical.id || (m.client_id && m.client_id === canonical.client_id)
+          );
+          if (exists) {
+            return prev.map((m) =>
+              m.id === canonical.id || (m.client_id && m.client_id === canonical.client_id) ? canonical : m
+            );
+          }
+          return [canonical, ...prev];
+        });
+        setSpace((prev) => (prev ? { ...prev, memories_count: prev.memories_count + 1 } : null));
+      }
+    });
+
+    return () => {
+      unsubscribeDrops();
+      unsubscribeReconcile();
+    };
+  }, [user, spaceId]);
+
+  // Fetch Space data without blocking memories on members
   useEffect(() => {
     if (!user || !spaceId) return;
     let isMounted = true;
 
-    const fetchSpace = async () => {
+    // 1. Fetch space details and memories
+    const fetchCoreData = async () => {
       try {
-        const [fetchedSpace, fetchedMemories, fetchedMembers] = await Promise.all([
+        const [fetchedSpace, fetchedMemories] = await Promise.all([
           apiRequest<Space>(`/spaces/${spaceId}`),
           apiRequest<Memory[]>(`/memories/space/${spaceId}`),
-          apiRequest<SpaceMember[]>(`/spaces/${spaceId}/members`),
         ]);
         if (isMounted) {
           setSpace(fetchedSpace);
-          setMemories(fetchedMemories);
-          setMembers(fetchedMembers);
+          setServerMemories(fetchedMemories);
         }
       } catch (err: unknown) {
         if (isMounted) {
@@ -61,11 +108,37 @@ export default function SpaceDetailPage() {
       }
     };
 
-    fetchSpace();
+    // 2. Fetch members independently (non-blocking)
+    const fetchMembers = async () => {
+      try {
+        const fetchedMembers = await apiRequest<SpaceMember[]>(`/spaces/${spaceId}/members`);
+        if (isMounted) {
+          setMembers(fetchedMembers);
+        }
+      } catch (err) {
+        console.error("Failed to load members:", err);
+      }
+    };
+
+    fetchCoreData();
+    fetchMembers();
+
     return () => {
       isMounted = false;
     };
   }, [user, spaceId, refreshTrigger]);
+
+  // Merge server memories + pending drops (deduplicated by client_id / id)
+  const memories = useMemo(() => {
+    const canonicalClientIds = new Set(serverMemories.map((m) => m.client_id).filter(Boolean));
+    const canonicalIds = new Set(serverMemories.map((m) => m.id));
+
+    const optimistic = pendingDrops
+      .filter((d) => !canonicalClientIds.has(d.id) && !canonicalIds.has(d.id))
+      .map(pendingDropToMemory);
+
+    return [...optimistic, ...serverMemories];
+  }, [pendingDrops, serverMemories]);
 
   if (isAuthLoading || (isLoading && !space)) {
     return (
@@ -98,9 +171,9 @@ export default function SpaceDetailPage() {
       {/* Header */}
       <SpaceHeader space={space} />
 
-      {/* Tabs */}
-      <div className="sticky top-14 z-30 bg-white border-b border-neutral-200">
-        <div className="flex items-center justify-around h-12 max-w-xl mx-auto text-xs font-bold">
+      {/* View Switcher Tabs */}
+      <div className="w-full border-b border-neutral-100 bg-white sticky top-14 z-20">
+        <div className="flex items-center justify-around h-11 text-xs font-semibold">
           <button
             onClick={() => setActiveTab("feed")}
             className={`flex-1 h-full flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
@@ -122,7 +195,7 @@ export default function SpaceDetailPage() {
             }`}
           >
             <Grid className="w-4 h-4" />
-            <span>Memories</span>
+            <span>Grid</span>
           </button>
 
           <button
@@ -157,7 +230,8 @@ export default function SpaceDetailPage() {
                   key={memory.id}
                   memory={memory}
                   onDelete={(id) => {
-                    setMemories((prev) => prev.filter((m) => m.id !== id));
+                    setServerMemories((prev) => prev.filter((m) => m.id !== id));
+                    setPendingDrops((prev) => prev.filter((d) => d.id !== id));
                     setSpace((prev) =>
                       prev ? { ...prev, memories_count: Math.max(0, prev.memories_count - 1) } : null
                     );
@@ -181,7 +255,11 @@ export default function SpaceDetailPage() {
             <MemoriesGrid
               memories={memories}
               onMemoryDeleted={(id) => {
-                setMemories((prev) => prev.filter((m) => m.id !== id));
+                setServerMemories((prev) => prev.filter((m) => m.id !== id));
+                setPendingDrops((prev) => prev.filter((d) => d.id !== id));
+                setSpace((prev) =>
+                  prev ? { ...prev, memories_count: Math.max(0, prev.memories_count - 1) } : null
+                );
               }}
             />
           )

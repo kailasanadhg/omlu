@@ -8,6 +8,7 @@ from app.models.like import Like
 from app.models.comment import Comment
 from app.models.notification import Notification
 from app.models.note import Note
+from app.models.upload_session import UploadSession
 
 __all__ = [
     "Base",

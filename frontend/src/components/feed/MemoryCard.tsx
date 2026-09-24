@@ -2,9 +2,10 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Heart, MessageCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, MoreHorizontal, Trash2, AlertCircle, RotateCw } from "lucide-react";
 import { Memory, Note } from "@/types";
 import { apiRequest } from "@/lib/api";
+import { retryPendingDrop, deletePendingDrop } from "@/lib/dropQueue";
 import { Avatar } from "../ui/Avatar";
 import { Carousel } from "./Carousel";
 import { CommentSheet } from "../modals/CommentSheet";
@@ -30,6 +31,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
 
   const handleLikeToggle = async () => {
+    if (memory.is_optimistic) return;
     // Optimistic toggle
     const nextState = !isLiked;
     setIsLiked(nextState);
@@ -51,7 +53,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noteBody.trim() || isSubmittingNote) return;
+    if (memory.is_optimistic || !noteBody.trim() || isSubmittingNote) return;
 
     setIsSubmittingNote(true);
     try {
@@ -84,6 +86,11 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
     if (!confirm("Are you sure you want to delete this memory?")) return;
     setIsDeleting(true);
     try {
+      if (memory.is_optimistic) {
+        await deletePendingDrop(memory.id, true);
+        onDelete?.(memory.id);
+        return;
+      }
       await apiRequest(`/memories/${memory.id}`, { method: "DELETE" });
       onDelete?.(memory.id);
     } catch (err: unknown) {
@@ -156,10 +163,43 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
       </div>
 
       {/* Photo Carousel */}
-      <Carousel
-        items={memory.media_items}
-        onDoubleTap={!isLiked ? handleLikeToggle : undefined}
-      />
+      <div className="relative">
+        {memory.is_optimistic && (
+          <div className="absolute top-3 left-3 z-30 pointer-events-auto">
+            {memory.upload_status === "failed" ? (
+              <div className="bg-red-600/90 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Upload failed</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    retryPendingDrop(memory.id);
+                  }}
+                  className="ml-1 px-2 py-0.5 bg-white text-red-700 rounded-full hover:bg-neutral-100 font-bold active:scale-95 flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  <span>Retry</span>
+                </button>
+              </div>
+            ) : (
+              <div className="bg-black/60 backdrop-blur-md text-white text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 animate-in fade-in">
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>
+                  {memory.upload_status === "creating"
+                    ? "Adding to Space..."
+                    : memory.upload_status === "uploading"
+                    ? `Uploading${typeof memory.upload_progress === "number" && memory.upload_progress > 0 ? ` ${memory.upload_progress}%` : "..."}`
+                    : "Queued..."}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+        <Carousel
+          items={memory.media_items}
+          onDoubleTap={!isLiked ? handleLikeToggle : undefined}
+        />
+      </div>
 
       {/* Interactions Bar */}
       <div className="px-3.5 pt-3 pb-1">
@@ -167,7 +207,10 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
           {/* Like */}
           <button
             onClick={handleLikeToggle}
-            className="flex items-center gap-1.5 text-neutral-800 hover:text-black active:scale-90 transition-transform"
+            disabled={memory.is_optimistic}
+            className={`flex items-center gap-1.5 text-neutral-800 hover:text-black active:scale-90 transition-transform ${
+              memory.is_optimistic ? "opacity-40 cursor-not-allowed" : ""
+            }`}
             aria-label={isLiked ? "Unlike" : "Like"}
           >
             <Heart

@@ -17,7 +17,8 @@ export interface CloudinaryUploadResult {
 export async function uploadDirectToCloudinary(
   blob: Blob,
   signature: CloudinarySignature,
-  onProgress?: (progressPercent: number) => void
+  onProgress?: (progressPercent: number) => void,
+  options?: { timeoutMs?: number; signal?: AbortSignal }
 ): Promise<CloudinaryUploadResult> {
   const formData = new FormData();
   formData.append("file", blob);
@@ -26,10 +27,28 @@ export async function uploadDirectToCloudinary(
   formData.append("signature", signature.signature);
   formData.append("folder", signature.folder);
   formData.append("public_id", signature.public_id);
+  if (signature.overwrite === false) {
+    formData.append("overwrite", "false");
+  }
+
+  const timeoutMs = options?.timeoutMs ?? 45000;
+  const signal = options?.signal;
 
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Upload aborted"));
+      return;
+    }
+
     const xhr = new XMLHttpRequest();
     xhr.open("POST", signature.upload_url, true);
+    xhr.timeout = timeoutMs;
+
+    const onAbort = () => {
+      xhr.abort();
+      reject(new Error("Upload aborted"));
+    };
+    signal?.addEventListener("abort", onAbort);
 
     if (xhr.upload && onProgress) {
       xhr.upload.onprogress = (e) => {
@@ -41,6 +60,7 @@ export async function uploadDirectToCloudinary(
     }
 
     xhr.onload = () => {
+      signal?.removeEventListener("abort", onAbort);
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const res = JSON.parse(xhr.responseText);
@@ -67,7 +87,18 @@ export async function uploadDirectToCloudinary(
     };
 
     xhr.onerror = () => {
+      signal?.removeEventListener("abort", onAbort);
       reject(new Error("Network error during Cloudinary upload"));
+    };
+
+    xhr.ontimeout = () => {
+      signal?.removeEventListener("abort", onAbort);
+      reject(new Error(`Upload timed out after ${timeoutMs / 1000}s`));
+    };
+
+    xhr.onabort = () => {
+      signal?.removeEventListener("abort", onAbort);
+      reject(new Error("Upload aborted"));
     };
 
     xhr.send(formData);

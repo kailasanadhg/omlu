@@ -81,6 +81,7 @@ export interface Note {
 
 export interface Memory {
   id: string;
+  client_id?: string | null;
   space_id: string;
   space_name: string;
   author_id: string;
@@ -96,6 +97,11 @@ export interface Memory {
   comments_count: number;
   notes: Note[];
   can_delete: boolean;
+  // Optimistic & draft queue fields
+  is_optimistic?: boolean;
+  upload_status?: "queued" | "signing" | "uploading" | "creating" | "failed" | "confirmed";
+  upload_progress?: number;
+  error_message?: string | null;
 }
 
 export interface Comment {
@@ -125,6 +131,8 @@ export interface ActivityItem {
 }
 
 export interface CloudinarySignature {
+  upload_session_id?: string | null;
+  overwrite?: boolean | null;
   signature: string;
   timestamp: number;
   api_key: string;

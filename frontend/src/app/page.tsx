@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -9,13 +9,22 @@ import { Space, Memory } from "@/types";
 import { SpaceCircles } from "@/components/feed/SpaceCircles";
 import { MemoryCard } from "@/components/feed/MemoryCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  PendingDrop,
+  getPendingDropsForUser,
+  subscribeToPendingDrops,
+  subscribeToDropReconciliation,
+  pendingDropToMemory,
+  initDropQueue,
+} from "@/lib/dropQueue";
 
 export default function HomePage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
 
   const [spaces, setSpaces] = useState<Space[]>([]);
-  const [memories, setMemories] = useState<Memory[]>([]);
+  const [serverMemories, setServerMemories] = useState<Memory[]>([]);
+  const [pendingDrops, setPendingDrops] = useState<PendingDrop[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -23,6 +32,39 @@ export default function HomePage() {
       router.replace("/login");
     }
   }, [user, isAuthLoading, router]);
+
+  // Initialize drop queue and load pending drops
+  useEffect(() => {
+    if (!user) return;
+
+    initDropQueue(user.id).then(() => {
+      getPendingDropsForUser(user.id).then(setPendingDrops);
+    });
+
+    const unsubscribeDrops = subscribeToPendingDrops((allDrops) => {
+      const userDrops = allDrops.filter((d) => d.userId === user.id && d.status !== "confirmed");
+      setPendingDrops(userDrops);
+    });
+
+    const unsubscribeReconcile = subscribeToDropReconciliation((canonical) => {
+      setServerMemories((prev) => {
+        const exists = prev.some(
+          (m) => m.id === canonical.id || (m.client_id && m.client_id === canonical.client_id)
+        );
+        if (exists) {
+          return prev.map((m) =>
+            m.id === canonical.id || (m.client_id && m.client_id === canonical.client_id) ? canonical : m
+          );
+        }
+        return [canonical, ...prev];
+      });
+    });
+
+    return () => {
+      unsubscribeDrops();
+      unsubscribeReconcile();
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -34,7 +76,7 @@ export default function HomePage() {
           apiRequest<Memory[]>("/memories/feed"),
         ]);
         setSpaces(fetchedSpaces);
-        setMemories(fetchedFeed);
+        setServerMemories(fetchedFeed);
       } catch (err) {
         console.error("Error fetching home data", err);
       } finally {
@@ -44,6 +86,18 @@ export default function HomePage() {
 
     fetchData();
   }, [user]);
+
+  // Merge server memories + user's pending drops
+  const memories = useMemo(() => {
+    const canonicalClientIds = new Set(serverMemories.map((m) => m.client_id).filter(Boolean));
+    const canonicalIds = new Set(serverMemories.map((m) => m.id));
+
+    const optimistic = pendingDrops
+      .filter((d) => !canonicalClientIds.has(d.id) && !canonicalIds.has(d.id))
+      .map(pendingDropToMemory);
+
+    return [...optimistic, ...serverMemories];
+  }, [pendingDrops, serverMemories]);
 
   if (isAuthLoading || (isLoading && user)) {
     return (
@@ -80,7 +134,8 @@ export default function HomePage() {
                 key={memory.id}
                 memory={memory}
                 onDelete={(deletedId) => {
-                  setMemories((prev) => prev.filter((m) => m.id !== deletedId));
+                  setServerMemories((prev) => prev.filter((m) => m.id !== deletedId));
+                  setPendingDrops((prev) => prev.filter((d) => d.id !== deletedId));
                 }}
               />
             ))}
