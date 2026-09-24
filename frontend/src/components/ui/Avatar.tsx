@@ -11,7 +11,7 @@ interface AvatarProps {
 }
 
 export function Avatar({ src, name, size = "md", className = "" }: AvatarProps) {
-  const [imageError, setImageError] = useState(false);
+  const [errorSrc, setErrorSrc] = useState<string | null>(null);
 
   const sizeClasses = {
     xs: "w-6 h-6 text-[10px]",
@@ -29,17 +29,19 @@ export function Avatar({ src, name, size = "md", className = "" }: AvatarProps) 
     .toUpperCase();
 
   const optimizedSrc = src ? getOptimizedImageUrl(src, "avatar") : null;
+  const hasError = Boolean(optimizedSrc && errorSrc === optimizedSrc);
 
   return (
     <div
       className={`relative inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 select-none bg-neutral-200 text-neutral-700 font-semibold border border-neutral-100 ${sizeClasses} ${className}`}
     >
-      {optimizedSrc && !imageError ? (
+      {optimizedSrc && !hasError ? (
         <img
+          key={optimizedSrc}
           src={optimizedSrc}
           alt={name}
           className="w-full h-full object-cover"
-          onError={() => setImageError(true)}
+          onError={() => setErrorSrc(optimizedSrc)}
           loading="lazy"
         />
       ) : (

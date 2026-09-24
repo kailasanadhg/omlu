@@ -61,7 +61,15 @@ function EditProfileForm({ user }: { user: User }) {
 
       // 2. Upload cropped avatar directly to Cloudinary
       const res = await uploadDirectToCloudinary(croppedBlob, signatureData);
+
+      // 3. Immediately persist to the user's database record and update global auth state
+      const updated = await apiRequest<User>("/users/me/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ avatar_url: res.secure_url }),
+      });
+
       setAvatarUrl(res.secure_url);
+      updateUserContext(updated);
       setIsCropModalOpen(false);
 
       if (selectedImageSrc) {
@@ -70,6 +78,25 @@ function EditProfileForm({ user }: { user: User }) {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to upload avatar";
+      setError(message);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setIsUploadingAvatar(true);
+    setError("");
+
+    try {
+      const updated = await apiRequest<User>("/users/me/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ avatar_url: null }),
+      });
+      setAvatarUrl(null);
+      updateUserContext(updated);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to remove avatar";
       setError(message);
     } finally {
       setIsUploadingAvatar(false);
@@ -186,8 +213,9 @@ function EditProfileForm({ user }: { user: User }) {
                 <span className="text-neutral-300">·</span>
                 <button
                   type="button"
-                  onClick={() => setAvatarUrl(null)}
-                  className="text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+                  onClick={handleRemovePhoto}
+                  disabled={isUploadingAvatar}
+                  className="text-xs font-semibold text-red-600 hover:underline cursor-pointer disabled:opacity-50"
                 >
                   Remove Photo
                 </button>

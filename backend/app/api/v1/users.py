@@ -98,11 +98,11 @@ async def update_profile(
         if clean_name:
             current_user.display_name = clean_name
 
-    if payload.bio is not None:
-        current_user.bio = payload.bio.strip() or None
+    if "bio" in payload.model_fields_set:
+        current_user.bio = payload.bio.strip() if payload.bio else None
 
-    if payload.avatar_url is not None:
-        current_user.avatar_url = payload.avatar_url.strip() or None
+    if "avatar_url" in payload.model_fields_set:
+        current_user.avatar_url = payload.avatar_url.strip() if payload.avatar_url else None
 
     await db.commit()
     await db.refresh(current_user)

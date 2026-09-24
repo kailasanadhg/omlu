@@ -88,10 +88,19 @@ export function getOptimizedImageUrl(
     return url;
   }
 
+  // If the URL already contains transformation segments, avoid duplicate injection
+  if (
+    url.includes("/image/upload/f_auto") ||
+    url.includes("/image/upload/c_") ||
+    url.includes("/image/upload/w_")
+  ) {
+    return url;
+  }
+
   const transformations: Record<string, string> = {
     feed: "f_auto,q_auto,w_1080,c_limit",
     grid: "f_auto,q_auto,w_400,h_400,c_fill",
-    avatar: "f_auto,q_auto,w_200,h_200,c_fill,g_face",
+    avatar: "f_auto,q_auto,w_200,h_200,c_fill",
     cover: "f_auto,q_auto,w_1200,h_600,c_fill",
     full: "f_auto,q_auto",
   };
