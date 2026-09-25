@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, date
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Text, Date, DateTime, ForeignKey, func, String, UniqueConstraint
+from sqlalchemy import Text, Date, DateTime, ForeignKey, func, String, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 
 class Memory(Base):
     __tablename__ = "memories"
-    __table_args__ = (UniqueConstraint("author_id", "client_id", name="uq_memory_author_client"),)
+    __table_args__ = (UniqueConstraint("author_id", "client_id", name="uq_memory_author_client"),
+        Index("ix_memories_space_collection", "space_id", "memory_date", "created_at", "id"),
+        Index("ix_memories_author_collection", "author_id", "memory_date", "created_at", "id"))
 
     client_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     request_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

@@ -2,35 +2,39 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Settings, LogOut, Grid, Sparkles, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/api";
 import { UserProfile, Memory } from "@/types";
 import { Avatar } from "@/components/ui/Avatar";
 import { MemoriesGrid } from "@/components/space/MemoriesGrid";
+import { LoadMoreMemories } from "@/components/space/LoadMoreMemories";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function UserProfilePage() {
   const params = useParams();
-  const router = useRouter();
+  const { user } = useAuth();
+  return <PageContent key={`${params.username}:${user?.id || "anonymous"}`} />;
+}
+
+function PageContent() {
+  const params = useParams();
   const username = params.username as string;
   const { user: currentUser, logout, isLoading: isAuthLoading } = useAuth();
 
+  const [attempt, setAttempt] = useState(0);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isAuthLoading && !currentUser) {
-      router.replace("/login");
-    }
-  }, [currentUser, isAuthLoading, router]);
-
-  useEffect(() => {
-    if (!currentUser || !username) return;
+    if (isAuthLoading || !username) return;
+    // Reset the visible request state when this resource or retry changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLoading(true); setError(""); setProfile(null); setMemories([]);
 
     let isMounted = true;
     const cleanUsername = username.replace(/^@/, "");
@@ -42,8 +46,9 @@ export default function UserProfilePage() {
         setProfile(userProfile);
 
         // Fetch memories for this user respecting privacy boundaries
-        const userMemories = await apiRequest<Memory[]>(`/memories/user/${userProfile.id}`);
+        const userMemories = await apiRequest<Memory[]>(`/memories/user/${userProfile.id}?limit=30`);
         if (!isMounted) return;
+        if (!Array.isArray(userMemories)) throw new Error("Invalid memory response");
         setMemories(userMemories);
       } catch (err: unknown) {
         if (!isMounted) return;
@@ -58,7 +63,7 @@ export default function UserProfilePage() {
     return () => {
       isMounted = false;
     };
-  }, [username, currentUser]);
+  }, [username, currentUser, isAuthLoading, attempt]);
 
   if (isAuthLoading || (isLoading && !profile)) {
     return (
@@ -72,10 +77,11 @@ export default function UserProfilePage() {
   if (error || !profile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center max-w-sm mx-auto">
-        <h2 className="text-xl font-bold text-neutral-900 mb-2">User Not Found</h2>
+        <h2 className="text-xl font-bold text-neutral-900 mb-2">Couldn’t load this profile</h2>
         <p className="text-xs text-neutral-500 mb-6">
-          The user @{username} does not exist.
+          {error || "Please try again."}
         </p>
+        <button className="mb-4 underline" onClick={() => setAttempt(n => n + 1)}>Try again</button>
         <Link href="/">
           <Button variant="primary">Return Home</Button>
         </Link>
@@ -108,13 +114,13 @@ export default function UserProfilePage() {
               <div>
                 <span className="font-bold text-neutral-900">{profile.memories_count}</span>{" "}
                 <span className="text-neutral-600">
-                  {profile.is_self ? "memories" : "shared memories"}
+                  public memories
                 </span>
               </div>
               <div>
                 <span className="font-bold text-neutral-900">{profile.spaces_count}</span>{" "}
                 <span className="text-neutral-600">
-                  {profile.is_self ? "spaces" : "shared spaces"}
+                  public spaces
                 </span>
               </div>
             </div>
@@ -153,7 +159,7 @@ export default function UserProfilePage() {
             <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-700 flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-neutral-500 shrink-0" />
               <span>
-                You do not share any private Spaces with @{profile.username}.
+                @{profile.username} has no public Spaces yet.
               </span>
             </div>
           )
@@ -172,12 +178,8 @@ export default function UserProfilePage() {
       <div className="flex-1 bg-white">
         {memories.length === 0 ? (
           <EmptyState
-            title={profile.is_self ? "No memories contributed yet." : "No shared memories."}
-            subtitle={
-              profile.is_self
-                ? "Add memories to your Spaces to see them in your profile."
-                : "Private Space memories are only visible to group members."
-            }
+            title="No public memories yet."
+            subtitle="Only contributions to public Spaces appear here. Private memories stay inside their Space."
             primaryActionText={profile.is_self ? "Explore Spaces" : undefined}
             primaryActionHref={profile.is_self ? "/spaces" : undefined}
             icon={<Sparkles className="w-8 h-8" />}
@@ -190,6 +192,7 @@ export default function UserProfilePage() {
             }}
           />
         )}
+        <LoadMoreMemories key={`${username}:${attempt}`} endpoint={`/memories/user/${profile.id}`} memories={memories} onLoad={items => setMemories(prev => [...prev, ...items.filter(item => !prev.some(m => m.id === item.id))])} />
       </div>
     </div>
   );

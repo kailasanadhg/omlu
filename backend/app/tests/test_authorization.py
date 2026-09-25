@@ -84,16 +84,9 @@ async def test_strict_private_space_and_profile_privacy(client: AsyncClient):
     assert res_mc.status_code == 201
     mem_c_id = res_mc.json()["id"]
 
-    # 8. Now User B visits User A's profile:
-    # Must see Memory MC, but STILL NOT Memory MA!
-    res_b_profile_mems2 = await client.get(f"/api/v1/memories/user/{user_a['id']}", headers=headers_b)
-    assert res_b_profile_mems2.status_code == 200
-    returned_mems = res_b_profile_mems2.json()
-    assert len(returned_mems) == 1
-    assert returned_mems[0]["id"] == mem_c_id
-    assert returned_mems[0]["caption"] == "Shared campfire memory C"
-
-    # User A viewing their own profile sees both memories (MA and MC)
-    res_a_profile_mems = await client.get(f"/api/v1/memories/user/{user_a['id']}", headers=headers_a)
-    assert res_a_profile_mems.status_code == 200
-    assert len(res_a_profile_mems.json()) == 2
+    # Private contributions stay inside Spaces even for shared members and self.
+    for headers in [headers_a, headers_b, {}]:
+        profile = await client.get(f"/api/v1/memories/user/{user_a['id']}", headers=headers)
+        assert profile.status_code == 200
+        assert profile.json() == []
+    assert (await client.get(f"/api/v1/memories/{mem_c_id}", headers=headers_b)).status_code == 200

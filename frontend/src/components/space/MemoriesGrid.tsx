@@ -1,76 +1,37 @@
 "use client";
-
-import React, { useState } from "react";
-import { Copy, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Memory } from "@/types";
-import { getOptimizedImageUrl } from "@/lib/cloudinary";
+import { MemoryImage } from "../ui/MemoryImage";
 import { MemoryCard } from "../feed/MemoryCard";
 
-interface MemoriesGridProps {
-  memories: Memory[];
-  onMemoryDeleted?: (id: string) => void;
-}
-
-export function MemoriesGrid({ memories, onMemoryDeleted }: MemoriesGridProps) {
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-
-  if (!memories || memories.length === 0) {
-    return null;
-  }
-
-  return (
-    <>
-      <div className="grid grid-cols-3 gap-0.5 sm:gap-1 bg-white">
-        {memories.map((memory) => {
-          const firstMedia = memory.media_items[0];
-          if (!firstMedia) return null;
-
-          const thumbUrl = getOptimizedImageUrl(firstMedia.secure_url, "grid");
-
-          return (
-            <div
-              key={memory.id}
-              onClick={() => setSelectedMemory(memory)}
-              className="relative aspect-square bg-neutral-100 cursor-pointer overflow-hidden group select-none"
-            >
-              <img
-                src={thumbUrl}
-                alt={memory.caption || "Memory thumbnail"}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                loading="lazy"
-              />
-
-              {/* Multi-photo indicator icon */}
-              {memory.media_items.length > 1 && (
-                <div className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/40 backdrop-blur-xs text-white">
-                  <Copy className="w-3.5 h-3.5" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Full Memory Modal when tapped */}
-      {selectedMemory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in">
-          <div className="relative w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setSelectedMemory(null)}
-              className="absolute top-3 right-3 z-30 p-1.5 rounded-full bg-black/50 text-white hover:bg-black transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <MemoryCard
-              memory={selectedMemory}
-              onDelete={(id) => {
-                setSelectedMemory(null);
-                onMemoryDeleted?.(id);
-              }}
-            />
-          </div>
+export function MemoriesGrid({ memories, onMemoryDeleted }: { memories: Memory[]; onMemoryDeleted?: (id: string) => void }) {
+  const [selected, setSelected] = useState<Memory | null>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!selected || !dialog.current) return;
+    const focus = document.activeElement as HTMLElement;
+    dialog.current.showModal();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = overflow; focus?.focus(); };
+  }, [selected]);
+  return <>
+    <div className="memory-masonry">
+      {memories.map(memory => <div key={memory.id} className="memory-tile">
+        <button className="block w-full text-left" onClick={() => setSelected(memory)} aria-label={`Open memory by @${memory.author_username} in ${memory.space_name}`}>
+          <MemoryImage item={memory.media_items?.[0]} alt={memory.caption || `Memory in ${memory.space_name}`} />
+          {memory.is_optimistic && <span className="text-xs">{memory.upload_status === "failed" ? "Upload failed — open to retry" : "Uploading…"}</span>}
+        </button>
+        <div className="flex justify-between gap-2 text-xs text-neutral-600 pt-2">
+          <Link href={`/u/${memory.author_username}`} className="truncate">@{memory.author_username}</Link>
+          <Link href={`/spaces/${memory.space_id}`} className="truncate">{memory.space_name}</Link>
         </div>
-      )}
-    </>
-  );
+      </div>)}
+    </div>
+    {selected && <dialog ref={dialog} onCancel={() => setSelected(null)} onClose={() => setSelected(null)} aria-label="Memory details" className="memory-dialog">
+      <div className="sticky top-0 z-40 flex justify-end bg-white p-2"><button onClick={() => { dialog.current?.close(); setSelected(null); }} className="px-4 py-2" aria-label="Close memory">Close ×</button></div>
+      <MemoryCard key={selected.id} memory={selected} onDelete={id => { setSelected(null); onMemoryDeleted?.(id); }} />
+    </dialog>}
+  </>;
 }

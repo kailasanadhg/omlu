@@ -18,8 +18,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   themeColor: "#000000",
   colorScheme: "light",
@@ -35,7 +33,7 @@ export default function RootLayout({
       <body className="bg-neutral-50 text-neutral-900 antialiased min-h-screen flex flex-col font-sans selection:bg-neutral-200 selection:text-neutral-900">
         <AuthProvider>
           <TopBar />
-          <main className="flex-1 w-full max-w-xl mx-auto pb-20 bg-white min-h-[calc(100vh-3.5rem)] shadow-xs">
+          <main className="flex-1 w-full max-w-[1600px] mx-auto pb-20 md:pb-8 bg-white min-h-[calc(100vh-3.5rem)]">
             {children}
           </main>
           <BottomNav />

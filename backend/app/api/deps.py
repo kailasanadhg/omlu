@@ -51,12 +51,21 @@ async def get_current_user_optional(
     if not token:
         return None
     try:
-        payload = decode_access_token(token)
-        if not payload or not payload.get("sub"):
+        return await get_current_user(token, db)
+    except HTTPException as exc:
+        if exc.status_code == 401:
             return None
-        user_id = uuid.UUID(payload.get("sub"))
-        stmt = select(User).where(User.id == user_id)
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
-    except Exception:
-        return None
+        raise
+
+async def require_space_read(space_id, current_user, db):
+    from app.models.space import Space
+    from app.models.membership import Membership
+    space = await db.get(Space, space_id)
+    if not space:
+        raise HTTPException(404, "Space not found")
+    member = await db.scalar(select(Membership.id).where(
+        Membership.space_id == space_id,
+        Membership.user_id == (current_user.id if current_user else None)))
+    if not member and space.visibility != "public":
+        raise HTTPException(403, "You are not a member of this private Space")
+    return space

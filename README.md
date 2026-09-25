@@ -1,5 +1,7 @@
 # OMLU — Our Memories Link Us
 
+Current implementation: **Space → People → Memories**. Web Home is a Space directory; collections use responsive masonry. Space visibility defaults to private, and public profiles contain only public-Space contributions. See [the Space-first implementation and deployment report](docs/audits/space-first/REPORT.md) for current migration, verification results, rollout steps, and the unresolved Cloudinary asset-delivery limitation. The original implementation notes below describe the earlier MVP and are superseded by that report where they differ.
+
 A shared social memory platform where groups create private **Spaces** to share collective photo memories.
 The core paradigm is **People → Spaces → Memories**.
 

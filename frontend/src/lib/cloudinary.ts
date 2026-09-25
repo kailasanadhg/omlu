@@ -130,7 +130,7 @@ export function getOptimizedImageUrl(
 
   const transformations: Record<string, string> = {
     feed: "f_auto,q_auto,w_1080,c_limit",
-    grid: "f_auto,q_auto,w_400,h_400,c_fill",
+    grid: "f_auto,q_auto,w_640,c_limit",
     avatar: "f_auto,q_auto,w_200,h_200,c_fill",
     cover: "f_auto,q_auto,w_1200,h_600,c_fill",
     full: "f_auto,q_auto",

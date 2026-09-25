@@ -6,16 +6,17 @@ from app.core.security import normalize_username, validate_username
 from app.models.user import User
 from app.models.membership import Membership
 from app.models.memory import Memory
+from app.models.space import Space
 from app.schemas.user import UserProfileOut, UserUpdate
 from app.schemas.auth import UserOut
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_optional
 
 router = APIRouter()
 
 @router.get("/@{username}", response_model=UserProfileOut)
 async def get_user_profile(
     username: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     clean_username = normalize_username(username)
@@ -29,39 +30,12 @@ async def get_user_profile(
             detail=f"User @{clean_username} not found"
         )
 
-    is_self = (current_user.id == target_user.id)
+    is_self = bool(current_user and current_user.id == target_user.id)
 
-    # Calculate accessible memories and spaces count
-    if is_self:
-        # Full counts for self
-        mem_stmt = select(func.count(Memory.id)).where(Memory.author_id == target_user.id)
-        space_stmt = select(func.count(Membership.id)).where(Membership.user_id == target_user.id)
-        mem_res = await db.execute(mem_stmt)
-        space_res = await db.execute(space_stmt)
-        mem_count = mem_res.scalar_one() or 0
-        space_count = space_res.scalar_one() or 0
-    else:
-        # Shared spaces only (CRITICAL PRIVACY RULE)
-        # Find shared spaces where BOTH current_user and target_user are members
-        shared_spaces_subq = (
-            select(Membership.space_id)
-            .where(Membership.user_id.in_([current_user.id, target_user.id]))
-            .group_by(Membership.space_id)
-            .having(func.count(Membership.user_id) == 2)
-            .subquery()
-        )
-        # Memories by target_user in shared spaces
-        mem_stmt = select(func.count(Memory.id)).where(
-            Memory.author_id == target_user.id,
-            Memory.space_id.in_(select(shared_spaces_subq.c.space_id))
-        )
-        # Shared space count
-        space_stmt = select(func.count(shared_spaces_subq.c.space_id))
-        
-        mem_res = await db.execute(mem_stmt)
-        space_res = await db.execute(space_stmt)
-        mem_count = mem_res.scalar_one() or 0
-        space_count = space_res.scalar_one() or 0
+    mem_count = await db.scalar(select(func.count(Memory.id)).join(Space).where(
+        Memory.author_id == target_user.id, Space.visibility == "public")) or 0
+    space_count = await db.scalar(select(func.count(Membership.id)).join(Space).where(
+        Membership.user_id == target_user.id, Space.visibility == "public")) or 0
 
     return UserProfileOut(
         id=target_user.id,

@@ -10,7 +10,7 @@ from app.models.space import Space
 from app.models.membership import Membership
 from app.models.memory import Memory
 from app.models.notification import Notification
-from app.schemas.space import SpaceCreate, SpaceOut, SpaceMemberOut, InvitePreviewOut
+from app.schemas.space import SpaceVisibilityUpdate, SpaceCreate, SpaceOut, SpaceMemberOut, InvitePreviewOut
 from app.api.deps import get_current_user, get_current_user_optional
 
 router = APIRouter()
@@ -30,6 +30,7 @@ async def create_space(
     
     space = Space(
         name=payload.name.strip(),
+        visibility=payload.visibility,
         description=payload.description.strip() if payload.description else None,
         cover_url=payload.cover_url.strip() if payload.cover_url else None,
         owner_id=current_user.id,
@@ -51,6 +52,7 @@ async def create_space(
     return SpaceOut(
         id=space.id,
         name=space.name,
+        visibility=space.visibility,
         description=space.description,
         cover_url=space.cover_url,
         owner_id=space.owner_id,
@@ -79,20 +81,20 @@ async def list_my_spaces(
     res = await db.execute(stmt)
     rows = res.all()
 
+    ids = [row[0].id for row in rows]
+    member_counts = dict((await db.execute(select(Membership.space_id, func.count(Membership.id)).where(Membership.space_id.in_(ids)).group_by(Membership.space_id))).all()) if ids else {}
+    memory_counts = dict((await db.execute(select(Memory.space_id, func.count(Memory.id)).where(Memory.space_id.in_(ids)).group_by(Memory.space_id))).all()) if ids else {}
     output = []
     for row in rows:
         space, role = row[0], row[1]
 
-        # Count total members across all users for this space
-        m_count_stmt = select(func.count(Membership.id)).where(Membership.space_id == space.id)
-        mem_count_stmt = select(func.count(Memory.id)).where(Memory.space_id == space.id)
-
-        m_count = (await db.execute(m_count_stmt)).scalar_one() or 0
-        mem_count = (await db.execute(mem_count_stmt)).scalar_one() or 0
+        m_count = member_counts.get(space.id, 0)
+        mem_count = memory_counts.get(space.id, 0)
 
         output.append(SpaceOut(
             id=space.id,
             name=space.name,
+            visibility=space.visibility,
             description=space.description,
             cover_url=space.cover_url,
             owner_id=space.owner_id,
@@ -195,6 +197,7 @@ async def join_space(
     return SpaceOut(
         id=space.id,
         name=space.name,
+        visibility=space.visibility,
         description=space.description,
         cover_url=space.cover_url,
         owner_id=space.owner_id,
@@ -209,7 +212,7 @@ async def join_space(
 @router.get("/{space_id}", response_model=SpaceOut)
 async def get_space(
     space_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = select(Space).where(Space.id == space_id)
@@ -220,10 +223,10 @@ async def get_space(
     # Authorization: User must be a member
     mem_stmt = select(Membership).where(
         Membership.space_id == space.id,
-        Membership.user_id == current_user.id
+        Membership.user_id == (current_user.id if current_user else None)
     )
     membership = (await db.execute(mem_stmt)).scalar_one_or_none()
-    if not membership:
+    if not membership and space.visibility != "public":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a member of this private Space"
@@ -237,14 +240,15 @@ async def get_space(
     return SpaceOut(
         id=space.id,
         name=space.name,
+        visibility=space.visibility,
         description=space.description,
         cover_url=space.cover_url,
         owner_id=space.owner_id,
-        invite_code=space.invite_code,
+        invite_code=space.invite_code if membership else "",
         members_count=m_count,
         memories_count=mem_count,
-        is_owner=(space.owner_id == current_user.id),
-        is_member=True,
+        is_owner=(space.owner_id == (current_user.id if current_user else None)),
+        is_member=membership is not None,
         created_at=space.created_at
     )
 
@@ -325,3 +329,15 @@ async def remove_space_member(
     await db.commit()
 
     return {"status": "removed"}
+
+@router.patch("/{space_id}", response_model=SpaceOut)
+async def update_space_visibility(space_id: uuid.UUID, payload: SpaceVisibilityUpdate,
+                                  current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    space = await db.get(Space, space_id)
+    if not space:
+        raise HTTPException(404, "Space not found")
+    if space.owner_id != current_user.id:
+        raise HTTPException(403, "Only the Space owner can change visibility")
+    space.visibility = payload.visibility
+    await db.commit()
+    return await get_space(space_id, current_user, db)

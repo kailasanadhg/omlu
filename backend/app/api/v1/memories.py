@@ -3,7 +3,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,7 @@ from app.models.note import Note
 from app.schemas.memory import MemoryCreate, MemoryOut
 from app.schemas.media import MediaItemOut
 from app.schemas.note import NoteOut
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_optional, require_space_read
 
 router = APIRouter()
 
@@ -32,13 +32,14 @@ async def memory_stats(ids: list[uuid.UUID], current_user_id: uuid.UUID, db: Asy
     likes = dict((await db.execute(select(Like.memory_id, func.count(Like.id)).where(Like.memory_id.in_(ids)).group_by(Like.memory_id))).all())
     liked = set((await db.execute(select(Like.memory_id).where(Like.memory_id.in_(ids), Like.user_id == current_user_id))).scalars())
     comments = dict((await db.execute(select(Comment.memory_id, func.count(Comment.id)).where(Comment.memory_id.in_(ids)).group_by(Comment.memory_id))).all())
-    return {id: (likes.get(id, 0), id in liked, comments.get(id, 0)) for id in ids}
+    writable = set((await db.execute(select(Memory.id).join(Membership, Membership.space_id == Memory.space_id).where(Memory.id.in_(ids), Membership.user_id == current_user_id))).scalars())
+    return {id: (likes.get(id, 0), id in liked, comments.get(id, 0), id in writable) for id in ids}
 
 
 async def format_memory_out(memory: Memory, current_user_id: uuid.UUID, space_owner_id: uuid.UUID, db: AsyncSession, stats: Optional[dict] = None) -> MemoryOut:
     if stats is None:
         stats = await memory_stats([memory.id], current_user_id, db)
-    likes_count, is_liked, comments_count = stats[memory.id]
+    likes_count, is_liked, comments_count, can_contribute = stats[memory.id]
 
     can_delete = (memory.author_id == current_user_id) or (space_owner_id == current_user_id)
 
@@ -88,6 +89,7 @@ async def format_memory_out(memory: Memory, current_user_id: uuid.UUID, space_ow
         is_liked_by_me=is_liked,
         comments_count=comments_count,
         notes=notes_out,
+        can_contribute=can_contribute,
         can_delete=can_delete
     )
 
@@ -271,96 +273,54 @@ async def get_home_feed(
 @router.get("/space/{space_id}", response_model=List[MemoryOut])
 async def get_space_memories(
     space_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(100, ge=1, le=100),
+    before: Optional[uuid.UUID] = None,
 ):
-    # Verify Space and membership
-    space_stmt = select(Space).where(Space.id == space_id)
-    space = (await db.execute(space_stmt)).scalar_one_or_none()
-    if not space:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
-
-    mem_stmt = select(Membership).where(
-        Membership.space_id == space_id,
-        Membership.user_id == current_user.id
-    )
-    membership = (await db.execute(mem_stmt)).scalar_one_or_none()
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized to view memories in this private Space"
-        )
-
-    stmt = (
-        select(Memory)
-        .where(Memory.space_id == space_id)
-        .options(
-            selectinload(Memory.author),
-            selectinload(Memory.space),
-            selectinload(Memory.media_items),
-            selectinload(Memory.notes).selectinload(Note.author)
-        )
-        .order_by(Memory.memory_date.desc(), Memory.created_at.desc())
-        .limit(100)
-    )
+    space = await require_space_read(space_id, current_user, db)
+    stmt = memory_collection().where(Memory.space_id == space_id)
+    stmt = await paginate_memories(stmt, before, limit, db)
     memories = (await db.execute(stmt)).scalars().all()
+    viewer_id = current_user.id if current_user else None
+    stats = await memory_stats([m.id for m in memories], viewer_id, db)
+    return [await format_memory_out(m, viewer_id, space.owner_id, db, stats) for m in memories]
 
-    stats = await memory_stats([m.id for m in memories], current_user.id, db)
-    return [await format_memory_out(m, current_user.id, space.owner_id, db, stats) for m in memories]
+
+def memory_collection():
+    return select(Memory).options(
+        selectinload(Memory.author), selectinload(Memory.space),
+        selectinload(Memory.media_items), selectinload(Memory.notes).selectinload(Note.author))
+
+
+async def paginate_memories(stmt, before, limit, db):
+    # Cursor is looked up within the already-authorized collection, never globally.
+    if before:
+        anchor = (await db.execute(stmt.where(Memory.id == before))).scalar_one_or_none()
+        if not anchor:
+            raise HTTPException(400, "Invalid memory cursor")
+        from sqlalchemy import tuple_
+        stmt = stmt.where(tuple_(Memory.memory_date, Memory.created_at, Memory.id) <
+                          tuple_(anchor.memory_date, anchor.created_at, anchor.id))
+    return stmt.order_by(Memory.memory_date.desc(), Memory.created_at.desc(), Memory.id.desc()).limit(limit)
+
 
 @router.get("/user/{user_id}", response_model=List[MemoryOut])
 async def get_user_memories(
     user_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(100, ge=1, le=100),
+    before: Optional[uuid.UUID] = None,
 ):
-    """
-    CRITICAL PRIVACY RULE:
-    Only return memories belonging to Spaces that BOTH current_user and user_id belong to.
-    """
-    if current_user.id == user_id:
-        # User viewing their own profile: return memories from all their spaces
-        user_spaces = select(Membership.space_id).where(Membership.user_id == user_id)
-        stmt = (
-            select(Memory, Space.owner_id)
-            .join(Space, Space.id == Memory.space_id)
-            .where(Memory.author_id == user_id, Memory.space_id.in_(user_spaces))
-            .options(
-                selectinload(Memory.author),
-                selectinload(Memory.space),
-                selectinload(Memory.media_items),
-                selectinload(Memory.notes).selectinload(Note.author)
-            )
-            .order_by(Memory.memory_date.desc(), Memory.created_at.desc())
-        )
-    else:
-        # User viewing someone else's profile: strictly find shared spaces
-        shared_spaces_subq = (
-            select(Membership.space_id)
-            .where(Membership.user_id.in_([current_user.id, user_id]))
-            .group_by(Membership.space_id)
-            .having(func.count(Membership.user_id) == 2)
-            .subquery()
-        )
-        stmt = (
-            select(Memory, Space.owner_id)
-            .join(Space, Space.id == Memory.space_id)
-            .where(
-                Memory.author_id == user_id,
-                Memory.space_id.in_(select(shared_spaces_subq.c.space_id))
-            )
-            .options(
-                selectinload(Memory.author),
-                selectinload(Memory.space),
-                selectinload(Memory.media_items),
-                selectinload(Memory.notes).selectinload(Note.author)
-            )
-            .order_by(Memory.memory_date.desc(), Memory.created_at.desc())
-        )
-
-    results = (await db.execute(stmt)).all()
-    stats = await memory_stats([m.id for m, _ in results], current_user.id, db)
-    return [await format_memory_out(m, current_user.id, owner_id, db, stats) for m, owner_id in results]
+    # Public profiles never aggregate private contributions, including for the owner.
+    stmt = memory_collection().join(Space, Space.id == Memory.space_id).where(
+        Memory.author_id == user_id, Space.visibility == "public")
+    stmt = await paginate_memories(stmt, before, limit, db)
+    memories = (await db.execute(stmt)).scalars().all()
+    viewer_id = current_user.id if current_user else None
+    stats = await memory_stats([m.id for m in memories], viewer_id, db)
+    return [await format_memory_out(m, viewer_id, m.space.owner_id, db, stats) for m in memories]
 
 @router.get("/by-client/{client_id}", response_model=MemoryOut)
 async def get_memory_by_client(client_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -373,7 +333,7 @@ async def get_memory_by_client(client_id: uuid.UUID, current_user: User = Depend
 @router.get("/{memory_id}", response_model=MemoryOut)
 async def get_memory_detail(
     memory_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = (
@@ -392,18 +352,9 @@ async def get_memory_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
     memory, owner_id = result
 
-    # Verify user is member of this space
-    mem_check = select(Membership).where(
-        Membership.space_id == memory.space_id,
-        Membership.user_id == current_user.id
-    )
-    if not (await db.execute(mem_check)).scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this private Space"
-        )
+    await require_space_read(memory.space_id, current_user, db)
 
-    return await format_memory_out(memory, current_user.id, owner_id, db)
+    return await format_memory_out(memory, current_user.id if current_user else None, owner_id, db)
 
 @router.delete("/{memory_id}")
 async def delete_memory(

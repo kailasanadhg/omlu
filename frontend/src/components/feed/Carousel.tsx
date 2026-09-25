@@ -3,7 +3,7 @@
 import React, { useState, useRef } from "react";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { MediaItem } from "@/types";
-import { getOptimizedImageUrl } from "@/lib/cloudinary";
+import { MemoryImage } from "../ui/MemoryImage";
 
 interface CarouselProps {
   items: MediaItem[];
@@ -47,20 +47,15 @@ export function Carousel({ items, onDoubleTap }: CarouselProps) {
   };
 
   const currentItem = items[currentIndex];
-  const optimizedUrl = getOptimizedImageUrl(currentItem.secure_url, "feed");
+
 
   return (
     <div
-      className="relative w-full aspect-square bg-neutral-950 overflow-hidden select-none"
+      className="relative w-full bg-neutral-950 overflow-hidden select-none"
       onClick={handleTouch}
     >
       {/* Active Photo */}
-      <img
-        src={optimizedUrl}
-        alt={`Memory photo ${currentIndex + 1}`}
-        className="w-full h-full object-cover transition-opacity duration-200"
-        loading="lazy"
-      />
+      <MemoryImage key={currentItem.secure_url} item={currentItem} alt={`Memory photo ${currentIndex + 1}`} full />
 
       {/* Floating double-tap heart animation */}
       {showHeartAnim && (

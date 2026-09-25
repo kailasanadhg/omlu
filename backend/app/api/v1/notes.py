@@ -12,14 +12,14 @@ from app.models.membership import Membership
 from app.models.note import Note
 from app.models.notification import Notification
 from app.schemas.note import NoteCreate, NoteOut
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_optional, require_space_read
 
 router = APIRouter()
 
 @router.get("/{memory_id}/notes", response_model=List[NoteOut])
 async def list_notes(
     memory_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     mem_stmt = select(Memory, Space.owner_id).join(Space, Space.id == Memory.space_id).where(Memory.id == memory_id)
@@ -28,13 +28,7 @@ async def list_notes(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
     memory, space_owner_id = result
 
-    # Check Space membership
-    mem_check = select(Membership).where(
-        Membership.space_id == memory.space_id,
-        Membership.user_id == current_user.id
-    )
-    if not (await db.execute(mem_check)).scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    await require_space_read(memory.space_id, current_user, db)
 
     stmt = (
         select(Note)
@@ -54,7 +48,7 @@ async def list_notes(
             author_avatar_url=n.author.avatar_url,
             body=n.body,
             created_at=n.created_at,
-            can_delete=(n.author_id == current_user.id or space_owner_id == current_user.id)
+            can_delete=(n.author_id == (current_user.id if current_user else None) or space_owner_id == (current_user.id if current_user else None))
         )
         for n in notes
     ]

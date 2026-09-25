@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import String, Text, DateTime, ForeignKey, func
+from sqlalchemy import String, Text, DateTime, ForeignKey, func, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
@@ -15,6 +15,9 @@ class Space(Base):
     __tablename__ = "spaces"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    visibility: Mapped[str] = mapped_column(String(7), nullable=False, default="private", server_default="private")
+    __table_args__ = (CheckConstraint("visibility IN ('public', 'private')", name="ck_space_visibility"),)
+
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     cover_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)

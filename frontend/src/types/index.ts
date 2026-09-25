@@ -20,6 +20,7 @@ export interface UserProfile {
 }
 
 export interface Space {
+  visibility: "public" | "private";
   id: string;
   name: string;
   description?: string | null;
@@ -80,6 +81,7 @@ export interface Note {
 }
 
 export interface Memory {
+  can_contribute?: boolean;
   id: string;
   client_id?: string | null;
   space_id: string;

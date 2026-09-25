@@ -25,7 +25,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-neutral-200 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 transition-all">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-neutral-200 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 transition-all">
         <div className="max-w-xl mx-auto px-4 flex items-center justify-around h-12">
           {/* Home */}
           <Link
@@ -33,7 +33,7 @@ export function BottomNav() {
             className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-colors ${
               isHome ? "text-black" : "text-neutral-500 hover:text-black"
             }`}
-            aria-label="Home Feed"
+            aria-label="Home"
           >
             <Home className={`w-6 h-6 ${isHome ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
           </Link>

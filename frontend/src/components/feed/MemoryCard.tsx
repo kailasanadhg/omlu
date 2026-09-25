@@ -31,7 +31,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
 
   const handleLikeToggle = async () => {
-    if (memory.is_optimistic) return;
+    if (memory.is_optimistic || memory.can_contribute === false) return;
     // Optimistic toggle
     const nextState = !isLiked;
     setIsLiked(nextState);
@@ -207,7 +207,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
           {/* Like */}
           <button
             onClick={handleLikeToggle}
-            disabled={memory.is_optimistic}
+            disabled={memory.is_optimistic || memory.can_contribute === false}
             className={`flex items-center gap-1.5 text-neutral-800 hover:text-black active:scale-90 transition-transform ${
               memory.is_optimistic ? "opacity-40 cursor-not-allowed" : ""
             }`}
@@ -308,6 +308,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
             </form>
           ) : (
             <button
+              disabled={memory.is_optimistic || memory.can_contribute === false}
               onClick={() => setIsAddingNote(true)}
               className="text-[11px] font-semibold text-neutral-500 hover:text-black flex items-center gap-1 transition-colors pt-0.5"
             >
@@ -337,7 +338,8 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
         memoryId={memory.id}
         isOpen={showComments}
         onClose={() => setShowComments(false)}
-        onCommentCountChange={(newCount) => setCommentsCount(newCount)}
+        onCommentCountChange={setCommentsCount}
+        canContribute={memory.can_contribute !== false}
       />
     </article>
   );

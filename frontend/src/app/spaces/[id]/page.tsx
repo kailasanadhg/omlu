@@ -2,14 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Sparkles, Grid, ListFilter, Users } from "lucide-react";
+import { Grid, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/api";
 import { Space, Memory, SpaceMember } from "@/types";
 import { SpaceHeader } from "@/components/space/SpaceHeader";
 import { MemoriesGrid } from "@/components/space/MemoriesGrid";
 import { MembersList } from "@/components/space/MembersList";
-import { MemoryCard } from "@/components/feed/MemoryCard";
+import { LoadMoreMemories } from "@/components/space/LoadMoreMemories";
+import { LoadState } from "@/components/ui/LoadState";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   PendingDrop,
@@ -22,6 +23,12 @@ import {
 
 export default function SpaceDetailPage() {
   const params = useParams();
+  const { user } = useAuth();
+  return <PageContent key={`${params.id}:${user?.id || "anonymous"}`} />;
+}
+
+function PageContent() {
+  const params = useParams();
   const router = useRouter();
   const spaceId = params.id as string;
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -29,16 +36,12 @@ export default function SpaceDetailPage() {
   const [space, setSpace] = useState<Space | null>(null);
   const [serverMemories, setServerMemories] = useState<Memory[]>([]);
   const [pendingDrops, setPendingDrops] = useState<PendingDrop[]>([]);
+  const [membersError, setMembersError] = useState("");
+  const [membersLoading, setMembersLoading] = useState(true);
   const [members, setMembers] = useState<SpaceMember[]>([]);
-  const [activeTab, setActiveTab] = useState<"feed" | "grid" | "members">("feed");
+  const [activeTab, setActiveTab] = useState<"grid" | "members">("grid");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!isAuthLoading && !user) {
-      router.replace("/login");
-    }
-  }, [user, isAuthLoading, router]);
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -47,8 +50,8 @@ export default function SpaceDetailPage() {
     if (!user || !spaceId) return;
 
     initDropQueue(user.id).then(() => {
-      getPendingDropsForSpace(user.id, spaceId).then(setPendingDrops);
-    });
+      return getPendingDropsForSpace(user.id, spaceId).then(setPendingDrops);
+    }).catch(() => { /* Server memories remain available if local storage is unavailable. */ });
 
     const unsubscribeDrops = subscribeToPendingDrops((allDrops) => {
       const spaceDrops = allDrops.filter(
@@ -82,18 +85,27 @@ export default function SpaceDetailPage() {
 
   // Fetch Space data without blocking memories on members
   useEffect(() => {
-    if (!user || !spaceId) return;
+    if (isAuthLoading || !spaceId) return;
     let isMounted = true;
 
+    // Reset the visible request state when this resource or retry changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError("");
+    setIsLoading(true);
+    setSpace(null);
+    setServerMemories([]);
+    setMembers([]);
     // 1. Fetch space details and memories
     const fetchCoreData = async () => {
       try {
         const [fetchedSpace, fetchedMemories] = await Promise.all([
           apiRequest<Space>(`/spaces/${spaceId}`),
-          apiRequest<Memory[]>(`/memories/space/${spaceId}`),
+          apiRequest<Memory[]>(`/memories/space/${spaceId}?limit=30`),
         ]);
         if (isMounted) {
+          if (!Array.isArray(fetchedMemories)) throw new Error("Invalid memory response");
           setSpace(fetchedSpace);
+          if (fetchedSpace.is_member) void fetchMembers();
           setServerMemories(fetchedMemories);
         }
       } catch (err: unknown) {
@@ -110,23 +122,24 @@ export default function SpaceDetailPage() {
 
     // 2. Fetch members independently (non-blocking)
     const fetchMembers = async () => {
+      setMembersLoading(true); setMembersError("");
       try {
         const fetchedMembers = await apiRequest<SpaceMember[]>(`/spaces/${spaceId}/members`);
         if (isMounted) {
           setMembers(fetchedMembers);
         }
-      } catch (err) {
-        console.error("Failed to load members:", err);
-      }
+      } catch {
+        if (isMounted) setMembersError("Couldn’t load people in this Space.");
+      } finally { if (isMounted) setMembersLoading(false); }
     };
 
     fetchCoreData();
-    fetchMembers();
+
 
     return () => {
       isMounted = false;
     };
-  }, [user, spaceId, refreshTrigger]);
+  }, [user, isAuthLoading, spaceId, refreshTrigger]);
 
   // Merge server memories + pending drops (deduplicated by client_id / id)
   const memories = useMemo(() => {
@@ -156,6 +169,7 @@ export default function SpaceDetailPage() {
         <p className="text-xs text-neutral-500 mb-6">
           {error || "You might not be a member of this private Space."}
         </p>
+        <button className="mb-4 underline" onClick={() => setRefreshTrigger(n => n + 1)}>Try again</button>
         <button
           onClick={() => router.push("/spaces")}
           className="text-xs font-bold text-black underline"
@@ -169,23 +183,11 @@ export default function SpaceDetailPage() {
   return (
     <div className="w-full flex flex-col min-h-screen">
       {/* Header */}
-      <SpaceHeader space={space} />
+      <SpaceHeader key={space.id} space={space} onChange={setSpace} />
 
       {/* View Switcher Tabs */}
       <div className="w-full border-b border-neutral-100 bg-white sticky top-14 z-20">
         <div className="flex items-center justify-around h-11 text-xs font-semibold">
-          <button
-            onClick={() => setActiveTab("feed")}
-            className={`flex-1 h-full flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
-              activeTab === "feed"
-                ? "border-black text-black"
-                : "border-transparent text-neutral-500 hover:text-black"
-            }`}
-          >
-            <ListFilter className="w-4 h-4" />
-            <span>Feed</span>
-          </button>
-
           <button
             onClick={() => setActiveTab("grid")}
             className={`flex-1 h-full flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
@@ -195,10 +197,10 @@ export default function SpaceDetailPage() {
             }`}
           >
             <Grid className="w-4 h-4" />
-            <span>Grid</span>
+            <span>Memories</span>
           </button>
 
-          <button
+          {space.is_member && <button
             onClick={() => setActiveTab("members")}
             className={`flex-1 h-full flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
               activeTab === "members"
@@ -207,47 +209,19 @@ export default function SpaceDetailPage() {
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Members ({members.length})</span>
-          </button>
+            <span>People ({space.members_count})</span>
+          </button>}
         </div>
       </div>
 
       {/* Tab Content */}
       <div className="flex-1 w-full pb-8">
-        {activeTab === "feed" && (
-          memories.length === 0 ? (
-            <EmptyState
-              title="No memories yet."
-              subtitle="Every Space starts somewhere."
-              primaryActionText="Capture the first moment"
-              primaryActionHref={`/camera?space_id=${space.id}`}
-              icon={<Sparkles className="w-8 h-8" />}
-            />
-          ) : (
-            <div className="divide-y divide-neutral-100">
-              {memories.map((memory) => (
-                <MemoryCard
-                  key={memory.id}
-                  memory={memory}
-                  onDelete={(id) => {
-                    setServerMemories((prev) => prev.filter((m) => m.id !== id));
-                    setPendingDrops((prev) => prev.filter((d) => d.id !== id));
-                    setSpace((prev) =>
-                      prev ? { ...prev, memories_count: Math.max(0, prev.memories_count - 1) } : null
-                    );
-                  }}
-                />
-              ))}
-            </div>
-          )
-        )}
-
         {activeTab === "grid" && (
           memories.length === 0 ? (
             <EmptyState
               title="No memories yet."
               subtitle="Photos posted to this Space will appear in a collective grid."
-              primaryActionText="Capture the first moment"
+              primaryActionText={space.is_member ? "Capture the first moment" : undefined}
               primaryActionHref={`/camera?space_id=${space.id}`}
               icon={<Grid className="w-8 h-8" />}
             />
@@ -265,7 +239,9 @@ export default function SpaceDetailPage() {
           )
         )}
 
-        {activeTab === "members" && (
+        {activeTab === "grid" && <LoadMoreMemories key={`${spaceId}:${refreshTrigger}`} endpoint={`/memories/space/${spaceId}`} memories={serverMemories} onLoad={items => setServerMemories(prev => [...prev, ...items.filter(item => !prev.some(m => m.id === item.id))])} />}
+
+        {activeTab === "members" && space.is_member && (membersLoading || membersError ? <LoadState loading={membersLoading} error={membersError} retry={() => setRefreshTrigger(n => n + 1)} /> :
           <MembersList
             spaceId={space.id}
             isOwner={space.is_owner}

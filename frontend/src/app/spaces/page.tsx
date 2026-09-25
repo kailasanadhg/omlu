@@ -7,6 +7,7 @@ import { Plus, Users, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/api";
 import { Space } from "@/types";
+import { LoadState } from "@/components/ui/LoadState";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getOptimizedImageUrl } from "@/lib/cloudinary";
@@ -14,6 +15,8 @@ import { getOptimizedImageUrl } from "@/lib/cloudinary";
 export default function SpacesPage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -25,11 +28,17 @@ export default function SpacesPage() {
 
   useEffect(() => {
     if (!user) return;
+    let active = true;
+    // Reset the visible request state when this resource or retry changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError("");
+    setIsLoading(true);
     apiRequest<Space[]>("/spaces")
-      .then((data) => setSpaces(data))
-      .catch((err) => console.error(err))
-      .finally(() => setIsLoading(false));
-  }, [user]);
+      .then((data) => { if (!Array.isArray(data)) throw new Error("Invalid Space response"); if (active) setSpaces(data); })
+      .catch(() => { if (active) setError("Couldn’t load your Spaces."); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [user, attempt]);
 
   if (isAuthLoading || (isLoading && user)) {
     return (
@@ -40,8 +49,11 @@ export default function SpacesPage() {
     );
   }
 
+  if (!user) return <LoadState loading />;
+  if (error) return <LoadState error={error} retry={() => setAttempt(n => n + 1)} />;
+
   return (
-    <div className="w-full px-4 py-5 max-w-xl mx-auto">
+    <div className="w-full px-4 py-8 md:px-8 mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -49,7 +61,7 @@ export default function SpacesPage() {
             Your Spaces
           </h1>
           <p className="text-xs text-neutral-600">
-            Private groups where you share collective memories
+            Places for your people and memories
           </p>
         </div>
 
@@ -65,16 +77,16 @@ export default function SpacesPage() {
       {spaces.length === 0 ? (
         <EmptyState
           title="No Spaces yet"
-          subtitle="Spaces are private groups for friends, batches, trips, and families."
+          subtitle="Create a shared archive for friends, trips, or everyday life."
           primaryActionText="+ Create your first Space"
           primaryActionHref="/spaces/new"
           icon={<Users className="w-8 h-8" />}
         />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {spaces.map((space) => {
             const cover = space.cover_url
-              ? getOptimizedImageUrl(space.cover_url, "avatar")
+              ? getOptimizedImageUrl(space.cover_url, "grid")
               : null;
             const initials = space.name.slice(0, 2).toUpperCase();
 
@@ -82,15 +94,15 @@ export default function SpacesPage() {
               <Link
                 key={space.id}
                 href={`/spaces/${space.id}`}
-                className="flex items-center justify-between p-3.5 rounded-2xl bg-white border border-neutral-200 hover:border-black transition-all group"
+                className="block py-3 group"
               >
-                <div className="flex items-center gap-3.5 overflow-hidden">
-                  <div className="w-14 h-14 rounded-2xl overflow-hidden bg-neutral-900 shrink-0 flex items-center justify-center text-white font-black text-sm">
+                <div className="flex flex-col gap-3 overflow-hidden">
+                  <div className="w-full aspect-[4/3] rounded-xl overflow-hidden bg-neutral-900 shrink-0 flex items-center justify-center text-white font-black text-sm">
                     {cover ? (
                       <img
                         src={cover}
                         alt={space.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover" loading="lazy" onError={e => { e.currentTarget.style.display = "none"; }}
                       />
                     ) : (
                       <span>{initials}</span>
@@ -102,7 +114,7 @@ export default function SpacesPage() {
                       {space.name}
                     </h3>
                     <span className="text-xs text-neutral-500 font-medium">
-                      {space.members_count} {space.members_count === 1 ? "member" : "members"} · {space.memories_count} {space.memories_count === 1 ? "memory" : "memories"}
+                      {space.visibility} · {space.members_count} {space.members_count === 1 ? "member" : "members"} · {space.memories_count} {space.memories_count === 1 ? "memory" : "memories"}
                     </span>
                     {space.description && (
                       <span className="text-xs text-neutral-600 truncate mt-0.5">

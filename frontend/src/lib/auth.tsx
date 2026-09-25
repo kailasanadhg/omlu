@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/types";
-import { apiRequest } from "@/lib/api";
+import { ApiError, apiRequest } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -24,9 +24,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [authError, setAuthError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     let isMounted = true;
     const initAuth = async () => {
+      setIsLoading(true);
+      setAuthError("");
       const savedToken = typeof window !== "undefined" ? localStorage.getItem("omlu_token") : null;
       if (!savedToken) {
         if (isMounted) setIsLoading(false);
@@ -38,7 +43,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(savedToken);
           setUser(fetchedUser);
         }
-      } catch {
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 401) {
+          if (isMounted) setAuthError("Couldn’t restore your session. Please try again.");
+          return;
+        }
         if (typeof window !== "undefined") {
           localStorage.removeItem("omlu_token");
         }
@@ -57,7 +66,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [attempt]);
+
+  useEffect(() => {
+    const expire = (event: Event) => {
+      if ((event as CustomEvent).detail !== localStorage.getItem("omlu_token")) return;
+      localStorage.removeItem("omlu_token");
+      setToken(null);
+      setUser(null);
+      router.replace("/login");
+    };
+    window.addEventListener("omlu:unauthorized", expire);
+    return () => window.removeEventListener("omlu:unauthorized", expire);
+  }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+    void import("@/lib/dropQueue").then(({ initDropQueue }) => initDropQueue(user.id)).catch(() => {
+      // Browser storage may be unavailable; server reads must still work.
+    });
+  }, [user]);
 
   const login = async (emailOrUsername: string, password: string): Promise<User> => {
     const res = await apiRequest<{ access_token: string; user: User }>("/auth/login", {
@@ -125,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUserContext,
       }}
     >
-      {children}
+      {authError ? <div role="alert" className="p-12 text-center"><p>{authError}</p><button className="mt-4 underline" onClick={() => setAttempt(n => n + 1)}>Try again</button></div> : children}
     </AuthContext.Provider>
   );
 }

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 
 export default function NewSpacePage() {
   const router = useRouter();
+  const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +31,7 @@ export default function NewSpacePage() {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
+          visibility,
           description: description.trim() || undefined,
         }),
       });
@@ -89,9 +91,13 @@ export default function NewSpacePage() {
           />
         </div>
 
-        <p className="text-xs text-neutral-600 leading-relaxed">
-          All Spaces on OMLU are private and invite-only. Anyone with the invite link or QR code can join.
-        </p>
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-semibold mb-2">Who can view this Space?</legend>
+          {(["private", "public"] as const).map(value => <label key={value} className="flex items-start gap-3 text-sm">
+            <input type="radio" name="visibility" value={value} checked={visibility === value} onChange={() => setVisibility(value)} className="mt-1" />
+            <span><strong className="capitalize">{value}</strong><span className="block text-neutral-600">{value === "private" ? "Only people in this Space can view it." : "Anyone can view this Space. Contributions appear on public profiles."}</span></span>
+          </label>)}
+        </fieldset>
 
         <Button
           type="submit"

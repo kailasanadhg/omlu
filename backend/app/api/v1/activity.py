@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.user import User
 from app.models.notification import Notification
+from app.models.membership import Membership
 from app.schemas.activity import ActivityItemOut
 from app.api.deps import get_current_user
 
@@ -18,7 +19,8 @@ async def get_activity(
 ):
     stmt = (
         select(Notification)
-        .where(Notification.user_id == current_user.id)
+        .where(Notification.user_id == current_user.id, Notification.space_id.in_(
+            select(Membership.space_id).where(Membership.user_id == current_user.id)))
         .options(selectinload(Notification.actor))
         .order_by(Notification.created_at.desc())
         .limit(50)

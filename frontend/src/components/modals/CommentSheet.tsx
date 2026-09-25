@@ -10,6 +10,7 @@ import { formatRelativeTime } from "@/lib/dates";
 
 interface CommentSheetProps {
   memoryId: string;
+  canContribute?: boolean;
   isOpen: boolean;
   onClose: () => void;
   onCommentCountChange?: (newCount: number) => void;
@@ -17,10 +18,13 @@ interface CommentSheetProps {
 
 export function CommentSheet({
   memoryId,
+  canContribute = true,
   isOpen,
   onClose,
   onCommentCountChange,
 }: CommentSheetProps) {
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -31,14 +35,15 @@ export function CommentSheet({
     let isMounted = true;
 
     const fetchComments = async () => {
+      setIsLoading(true); setError("");
       try {
         const data = await apiRequest<Comment[]>(`/memories/${memoryId}/comments`);
         if (isMounted) {
           setComments(data);
           onCommentCountChange?.(data.length);
         }
-      } catch (err) {
-        console.error("Failed to load comments", err);
+      } catch {
+        if (isMounted) setError("Couldn’t load comments.");
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -50,11 +55,11 @@ export function CommentSheet({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, memoryId, onCommentCountChange]);
+  }, [isOpen, memoryId, onCommentCountChange, attempt]);
 
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || isSubmitting) return;
+    if (!canContribute || !newComment.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
@@ -106,7 +111,7 @@ export function CommentSheet({
 
         {/* Comment List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {isLoading ? (
+          {error ? <div role="alert">{error}<button onClick={() => setAttempt(n => n + 1)} className="underline ml-3">Try again</button></div> : isLoading ? (
             <div className="flex items-center justify-center h-32 text-neutral-600 text-sm">
               Loading comments...
             </div>
@@ -171,7 +176,7 @@ export function CommentSheet({
           />
           <button
             type="submit"
-            disabled={!newComment.trim() || isSubmitting}
+            disabled={!canContribute || !newComment.trim() || isSubmitting}
             className="p-2.5 rounded-full bg-black text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-neutral-800 transition-colors"
           >
             <Send className="w-4 h-4" />

@@ -1,14 +1,19 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
 
+class SpaceVisibilityUpdate(BaseModel):
+    visibility: Literal["public", "private"]
+
 class SpaceCreate(BaseModel):
+    visibility: Literal["public", "private"] = "private"
     name: str = Field(..., min_length=2, max_length=100)
     description: Optional[str] = Field(None, max_length=1000)
     cover_url: Optional[str] = Field(None, max_length=512)
 
 class SpaceOut(BaseModel):
+    visibility: Literal["public", "private"] = "private"
     id: uuid.UUID
     name: str
     description: Optional[str] = None

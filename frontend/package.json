@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/photo_pipeline_client.test.cjs"
+    "test": "node tests/photo_pipeline_client.test.cjs",
+    "test:browser": "node tests/space_first_browser.cjs"
   },
   "dependencies": {
     "date-fns": "^4.4.0",

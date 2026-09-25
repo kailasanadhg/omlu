@@ -29,6 +29,7 @@ class MemoryOut(BaseModel):
     is_liked_by_me: bool = False
     comments_count: int = 0
     notes: List[NoteOut] = []
+    can_contribute: bool = False
     can_delete: bool = False
 
     model_config = ConfigDict(from_attributes=True)
