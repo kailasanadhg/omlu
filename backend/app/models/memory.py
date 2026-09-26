@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, date
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Text, Date, DateTime, ForeignKey, func, String, UniqueConstraint, Index
+from sqlalchemy import Text, Date, DateTime, Float, ForeignKey, func, String, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
@@ -30,6 +30,11 @@ class Memory(Base):
     memory_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    display_shape: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    crop_x: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    crop_y: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    crop_width: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    crop_height: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     author: Mapped["User"] = relationship("User", back_populates="memories")
     space: Mapped["Space"] = relationship("Space", back_populates="memories")

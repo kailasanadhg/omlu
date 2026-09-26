@@ -2,15 +2,16 @@
 
 import React, { useState, useRef } from "react";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
-import { MediaItem } from "@/types";
+import { MediaItem, MemoryPresentation } from "@/types";
 import { MemoryImage } from "../ui/MemoryImage";
 
 interface CarouselProps {
   items: MediaItem[];
+  presentation?: MemoryPresentation | null;
   onDoubleTap?: () => void;
 }
 
-export function Carousel({ items, onDoubleTap }: CarouselProps) {
+export function Carousel({ items, presentation, onDoubleTap }: CarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showHeartAnim, setShowHeartAnim] = useState(false);
   const lastTapRef = useRef<number>(0);
@@ -55,7 +56,7 @@ export function Carousel({ items, onDoubleTap }: CarouselProps) {
       onClick={handleTouch}
     >
       {/* Active Photo */}
-      <MemoryImage key={currentItem.secure_url} item={currentItem} alt={`Memory photo ${currentIndex + 1}`} full />
+      <MemoryImage key={currentItem.secure_url} item={currentItem} alt={`Memory photo ${currentIndex + 1}`} full presentation={currentIndex === 0 ? presentation : null} />
 
       {/* Floating double-tap heart animation */}
       {showHeartAnim && (

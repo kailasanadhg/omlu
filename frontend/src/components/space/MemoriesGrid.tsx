@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Memory } from "@/types";
 import { MemoryImage } from "../ui/MemoryImage";
 import { MemoryCard } from "../feed/MemoryCard";
-import { prototypeFormatForIndex } from "@/lib/presentationPrototype";
 
 export function MemoriesGrid({ memories, onMemoryDeleted }: { memories: Memory[]; onMemoryDeleted?: (id: string) => void }) {
   const [selected, setSelected] = useState<Memory | null>(null);
@@ -19,12 +18,11 @@ export function MemoriesGrid({ memories, onMemoryDeleted }: { memories: Memory[]
   }, [selected]);
   return <>
     <div className="memory-masonry">
-      {memories.map((memory, index) => {
-        const format = prototypeFormatForIndex(index);
-        return <div key={memory.id} className={`memory-tile memory-tile--${format.replace(":", "-")}`}>
+      {memories.map((memory) => {
+        return <div key={memory.id} className={`memory-tile ${memory.presentation?.display_shape === "circle" ? "memory-tile--circle" : ""}`}>
         <button className="block w-full text-left" onClick={() => setSelected(memory)} aria-label={`Open memory by @${memory.author_username} in ${memory.space_name}`}>
           <div className="memory-tile-photo">
-            <MemoryImage item={memory.media_items?.[0]} alt={memory.caption || `Memory in ${memory.space_name}`} presentationFormat={format} />
+            <MemoryImage item={memory.media_items?.[0]} alt={memory.caption || `Memory in ${memory.space_name}`} presentation={memory.presentation} />
           </div>
           {memory.is_optimistic && <span className="text-xs">{memory.upload_status === "failed" ? "Upload failed — open to retry" : "Uploading…"}</span>}
         </button>

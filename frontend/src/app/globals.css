@@ -58,7 +58,7 @@ select:-webkit-autofill:focus {
 
 
 :focus-visible { outline: 2px solid #171717; outline-offset: 4px; }
-/* Mixed-shape visual wall prototype. Presentation only; no stored crop or schema. */
+/* Mixed-shape visual wall. Each tile reads its Drop's saved presentation. */
 .memory-masonry { columns: 2; column-gap: 10px; padding: 14px 12px 28px; background: #faf8f3; }
 .memory-tile { break-inside: avoid; margin-bottom: 14px; display: inline-block; width: 100%; vertical-align: top; }
 .memory-tile-photo { overflow: hidden; }

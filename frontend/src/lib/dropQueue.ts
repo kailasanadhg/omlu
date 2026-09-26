@@ -1,4 +1,4 @@
-import { Memory, CloudinarySignature } from "@/types";
+import { Memory, CloudinarySignature, MemoryPresentation } from "@/types";
 import { apiRequest } from "@/lib/api";
 import { uploadDirectToCloudinary, CloudinaryUploadResult } from "@/lib/cloudinary";
 
@@ -21,6 +21,7 @@ export interface PendingDrop {
   blob: Blob;
   width: number;
   height: number;
+  presentation?: MemoryPresentation | null;
   status: DropStatus;
   progress: number;
   errorMessage?: string | null;
@@ -227,6 +228,7 @@ export function pendingDropToMemory(drop: PendingDrop): Memory {
         position: 0,
       },
     ],
+    presentation: drop.presentation ?? null,
     likes_count: 0,
     is_liked_by_me: false,
     comments_count: 0,
@@ -347,6 +349,7 @@ async function processSingleDrop(drop: PendingDrop) {
       space_id: drop.spaceId,
       caption: drop.caption,
       memory_date: drop.memoryDate,
+      presentation: drop.presentation ?? null,
       media_items: [
         {
           upload_session_id: sessionId,

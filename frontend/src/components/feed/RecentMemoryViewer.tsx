@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { RecentSpaceMemory } from "@/lib/recentSpaceMemories";
 import { getOptimizedImageUrl } from "@/lib/cloudinary";
+import { PresentedPhoto } from "@/components/ui/PresentedPhoto";
+import { legacyAspect, shapeAspect } from "@/lib/presentation";
 
 export function RecentMemoryViewer({
   memories, spaceName, spaceId, onClose,
@@ -17,6 +19,8 @@ export function RecentMemoryViewer({
   const [index, setIndex] = useState(0);
   const closeRef = useRef<HTMLButtonElement>(null);
   const current = memories[index];
+  const ratio = current?.presentation ? shapeAspect(current.presentation.display_shape)
+    : legacyAspect(current?.image_width, current?.image_height);
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -52,7 +56,11 @@ export function RecentMemoryViewer({
       <div className="flex-1 min-h-0 flex items-center justify-center gap-2 px-2 sm:px-6">
         <button onClick={() => setIndex(value => Math.max(0, value - 1))} disabled={index === 0} aria-label="Previous memory" className="p-2 disabled:opacity-25"><ChevronLeft className="w-7 h-7" /></button>
         <div className="flex-1 min-w-0 h-full flex items-center justify-center">
-          {current.image_url ? <img src={getOptimizedImageUrl(current.image_url, "feed")} alt={`Memory ${index + 1} in ${spaceName}`} className="max-w-full max-h-full object-contain" /> : <p className="text-sm text-white/70">Photo unavailable</p>}
+          {current.image_url ? <div style={{ width: `min(100%, calc((100dvh - 150px) * ${ratio}))` }}>
+            <PresentedPhoto src={getOptimizedImageUrl(current.image_url, "full")}
+              imageWidth={current.image_width} imageHeight={current.image_height}
+              presentation={current.presentation} alt={`Memory ${index + 1} in ${spaceName}`} />
+          </div> : <p className="text-sm text-white/70">Photo unavailable</p>}
         </div>
         <button onClick={() => setIndex(value => Math.min(memories.length - 1, value + 1))} disabled={index === memories.length - 1} aria-label="Next memory" className="p-2 disabled:opacity-25"><ChevronRight className="w-7 h-7" /></button>
       </div>

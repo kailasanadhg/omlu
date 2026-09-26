@@ -197,6 +197,7 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
         )}
         <Carousel
           items={memory.media_items}
+          presentation={memory.presentation}
           onDoubleTap={!isLiked ? handleLikeToggle : undefined}
         />
       </div>

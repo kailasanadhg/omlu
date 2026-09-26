@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { X, SwitchCamera, AlertCircle, Sparkles, CheckCircle2, RotateCw } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/api";
-import { Space } from "@/types";
-import { PrototypeFormat, prototypeFormats, prototypeAspectRatio } from "@/lib/presentationPrototype";
+import { Space, DisplayShape, MemoryPresentation } from "@/types";
+import { cameraPresentation, displayShapes, shapeAspect } from "@/lib/presentation";
+import { DropCropEditor } from "@/components/camera/DropCropEditor";
+import { PresentedPhoto } from "@/components/ui/PresentedPhoto";
 import {
   enqueueDrop,
   subscribeToPendingDrops,
@@ -31,18 +33,26 @@ function LiveCameraView() {
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
-  const [previewFormat, setPreviewFormat] = useState<PrototypeFormat>("3:4");
+  const [previewFormat, setPreviewFormat] = useState<DisplayShape>("portrait_3_4");
+  const [draft, setDraft] = useState<{ blob: Blob; url: string; width: number; height: number } | null>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const objectUrls = useRef(new Set<string>());
 
   // Shutter & feedback state
   const [flash, setFlash] = useState(false);
-  const [lastPreviewUrl, setLastPreviewUrl] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string>("One tap adds this moment.");
+  const [lastPreview, setLastPreview] = useState<{ url: string; width: number; height: number; presentation: MemoryPresentation } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>("Choose a frame, then capture.");
   const [statusType, setStatusType] = useState<"idle" | "adding" | "success" | "error">("idle");
   const [recentCaptureCount, setRecentCaptureCount] = useState<number>(0);
   const [failedDropId, setFailedDropId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => () => {
+    for (const url of objectUrls.current) URL.revokeObjectURL(url);
+    objectUrls.current.clear();
+  }, []);
 
   // Auth guard
   useEffect(() => {
@@ -120,7 +130,7 @@ function LiveCameraView() {
         if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
         resetTimerRef.current = setTimeout(() => {
           setStatusType("idle");
-          setStatusMessage("One tap adds this moment.");
+          setStatusMessage("Choose a frame, then capture.");
         }, 2500);
       }
     });
@@ -239,13 +249,59 @@ function LiveCameraView() {
     setRetryCount((prev) => prev + 1);
   };
 
-  // Instant non-blocking shutter tap handler
+  const handleGallery = async (file?: File) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const url = URL.createObjectURL(file);
+    objectUrls.current.add(url);
+    try {
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      setDraft({ blob: file, url, width: image.naturalWidth, height: image.naturalHeight });
+    } catch {
+      URL.revokeObjectURL(url);
+      objectUrls.current.delete(url);
+      setStatusType("error");
+      setStatusMessage("Couldn't open that photo.");
+    }
+  };
+
+  const postPhoto = (blob: Blob, width: number, height: number, presentation: MemoryPresentation, existingUrl?: string) => {
+    if (!space || !user) return;
+    const url = existingUrl ?? URL.createObjectURL(blob);
+    objectUrls.current.add(url);
+    if (lastPreview) {
+      URL.revokeObjectURL(lastPreview.url);
+      objectUrls.current.delete(lastPreview.url);
+    }
+    setLastPreview({ url, width, height, presentation });
+    const dropId = crypto.randomUUID();
+    setStatusType("adding");
+    setStatusMessage("Adding moment...");
+    enqueueDrop({
+      id: dropId, userId: user.id, spaceId: space.id, spaceName: space.name,
+      author: { id: user.id, username: user.username, display_name: user.display_name, avatar_url: user.avatar_url },
+      caption: null,
+      memoryDate: new Date().toISOString().split("T")[0],
+      createdAt: new Date().toISOString(),
+      blob, width, height, presentation,
+    });
+  };
+
+  const confirmDraft = (presentation: MemoryPresentation) => {
+    if (!draft || !space || !user) return;
+    postPhoto(draft.blob, draft.width, draft.height, presentation, draft.url);
+    setDraft(null);
+  };
+
+  // The selected shape is the live framing decision; shutter posts without a crop editor.
   const handleShutter = () => {
     const video = videoRef.current;
     if (!video || !isCameraReady || !spaceId || !space || !user) return;
 
     const width = video.videoWidth;
     const height = video.videoHeight;
+    const selectedShape = previewFormat;
     if (width <= 0 || height <= 0) return;
 
     // 1. Instant feedback: haptic vibration
@@ -273,40 +329,11 @@ function LiveCameraView() {
 
     ctx.drawImage(video, 0, 0, width, height);
 
-    // 4. Encode to blob once at JPEG 0.92 without downscale or second compression
+    // Keep the full frame. Its centered cover crop is exactly what the viewfinder showed.
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
-
-        // Immediate local preview URL for instant feedback
-        const previewUrl = URL.createObjectURL(blob);
-        setLastPreviewUrl(previewUrl);
-
-        // Persistent client UUID for idempotency
-        const dropId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `drop_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-        setStatusType("adding");
-        setStatusMessage("Adding moment...");
-
-        // Enqueue into persistent IndexedDB draft queue and trigger background upload
-        enqueueDrop({
-          id: dropId,
-          userId: user.id,
-          spaceId: space.id,
-          spaceName: space.name,
-          author: {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name,
-            avatar_url: user.avatar_url,
-          },
-          caption: null,
-          memoryDate: new Date().toISOString().split("T")[0],
-          createdAt: new Date().toISOString(),
-          blob,
-          width,
-          height,
-        });
+        postPhoto(blob, width, height, cameraPresentation(width, height, selectedShape));
       },
       "image/jpeg",
       0.92
@@ -363,8 +390,8 @@ function LiveCameraView() {
       {/* 2. FLOATING VIEWFINDER */}
       <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 flex items-center justify-center relative min-h-0">
         <div
-          className={`relative max-w-full shrink-0 overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center ${previewFormat === "circle" ? "rounded-full" : "rounded-3xl"}`}
-          style={{ aspectRatio: prototypeAspectRatio(previewFormat), width: `min(100%, calc((100dvh - 275px) * ${prototypeAspectRatio(previewFormat)}))` }}
+          className={`relative max-w-full shrink-0 overflow-hidden bg-neutral-900 ring-1 ring-white/10 shadow-2xl flex items-center justify-center ${previewFormat === "circle" ? "rounded-full" : "rounded-3xl"}`}
+          style={{ aspectRatio: shapeAspect(previewFormat), width: `min(100%, calc((100dvh - 275px) * ${shapeAspect(previewFormat)}))` }}
         >
           {/* Live Video Element - ALWAYS MOUNTED to prevent race condition */}
           <video
@@ -444,30 +471,28 @@ function LiveCameraView() {
 
       {/* 3. CAPTURE CONTROLS & DYNAMIC STATUS */}
       <footer className="w-full max-w-md mx-auto px-4 pt-2 pb-8 flex flex-col items-center gap-3 z-20">
-        <div className="w-full" aria-label="Presentation preview format">
-          <p className="text-center text-[11px] text-white/65 mb-2">Presentation preview · original photo is still uploaded</p>
+        <div className="w-full" aria-label="Camera framing guide">
+          <p className="text-center text-[11px] text-white/65 mb-2">Choose your frame before capture</p>
           <div className="flex justify-center gap-2">
-            {prototypeFormats.map((format) => <button
-              key={format}
+            {displayShapes.map(({ value, label }) => <button
+              key={value}
               type="button"
-              onClick={() => setPreviewFormat(format)}
-              aria-label={`Preview ${format === "circle" ? "circle" : format} format`}
-              aria-pressed={previewFormat === format}
-              className={`min-w-12 h-9 px-2 rounded-full border text-xs font-semibold transition-colors ${previewFormat === format ? "bg-white text-black border-white" : "text-white border-white/40 bg-white/10"}`}
-            >{format === "circle" ? "○" : format}</button>)}
+              onClick={() => setPreviewFormat(value)}
+              aria-label={`Frame ${label} format`}
+              aria-pressed={previewFormat === value}
+              className={`min-w-12 h-9 px-2 rounded-full border text-xs font-semibold transition-colors ${previewFormat === value ? "bg-white text-black border-white" : "text-white border-white/40 bg-white/10"}`}
+            >{label}</button>)}
           </div>
         </div>
         {/* Controls Bar: Preview Thumbnail + Shutter Button */}
         <div className="w-full flex items-center justify-between px-6">
           {/* Left: Immediate Local Captured Preview */}
           <div className="w-14 h-14 flex items-center justify-center">
-            {lastPreviewUrl ? (
-              <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-white/40 shadow-lg animate-in zoom-in-75">
-                <img
-                  src={lastPreviewUrl}
-                  alt="Captured preview"
-                  className="w-full h-full object-cover"
-                />
+            {lastPreview ? (
+              <div className="max-w-12 max-h-12 overflow-hidden border-2 border-white/40 shadow-lg animate-in zoom-in-75"
+                style={{ width: `min(48px, ${48 * shapeAspect(lastPreview.presentation.display_shape)}px)` }}>
+                <PresentedPhoto src={lastPreview.url} alt="Captured preview" imageWidth={lastPreview.width}
+                  imageHeight={lastPreview.height} presentation={lastPreview.presentation} />
               </div>
             ) : (
               <div className="w-12 h-12" />
@@ -484,8 +509,10 @@ function LiveCameraView() {
             <div className="w-16 h-16 rounded-full bg-white group-active:scale-95 transition-transform shadow-lg" />
           </button>
 
-          {/* Right: Balanced Spacer */}
-          <div className="w-14 h-14" />
+          <input ref={galleryRef} type="file" accept="image/*" className="hidden" aria-label="Choose photo from gallery"
+            onChange={event => { void handleGallery(event.target.files?.[0]); event.target.value = ""; }} />
+          <button type="button" onClick={() => galleryRef.current?.click()} disabled={!space || !user}
+            className="w-14 h-14 text-xs font-semibold text-white/80 disabled:opacity-40">Gallery</button>
         </div>
 
         {/* Dynamic Status Text */}
@@ -518,6 +545,12 @@ function LiveCameraView() {
           )}
         </div>
       </footer>
+      {draft && <DropCropEditor key={draft.url} src={draft.url} imageWidth={draft.width} imageHeight={draft.height}
+        initialShape={previewFormat} onConfirm={confirmDraft} onCancel={() => {
+          URL.revokeObjectURL(draft.url);
+          objectUrls.current.delete(draft.url);
+          setDraft(null);
+        }} />}
     </div>
   );
 }

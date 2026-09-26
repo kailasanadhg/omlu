@@ -26,6 +26,9 @@ def test_recent_endpoint_uses_one_membership_scoped_metadata_query():
     db = FakeDB([SimpleNamespace(
         id=memory_id, space_id=space_id, created_at=created_at,
         image_url="https://example.test/original.jpg",
+        image_width=1200, image_height=800,
+        display_shape=None, crop_x=None, crop_y=None,
+        crop_width=None, crop_height=None,
     )])
 
     result = asyncio.run(get_recent_space_memories(current_user=user, db=db))

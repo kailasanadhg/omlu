@@ -6,6 +6,8 @@ import { Plus } from "lucide-react";
 import { Space } from "@/types";
 import type { RecentSpaceMemory } from "@/lib/recentSpaceMemories";
 import { getOptimizedImageUrl } from "@/lib/cloudinary";
+import { PresentedPhoto } from "@/components/ui/PresentedPhoto";
+import { circleThumbnailCrop, validPresentation } from "@/lib/presentation";
 
 interface SpaceCirclesProps {
   spaces: Space[];
@@ -34,14 +36,19 @@ export function SpaceCircles({ spaces, recentBySpace, onOpenRecent }: SpaceCircl
         {spaces.map((space) => {
           const recent = recentBySpace?.get(space.id) ?? [];
           const cover = recent.length > 0 && recent.at(-1)?.image_url
-            ? getOptimizedImageUrl(recent.at(-1)?.image_url, "avatar")
+            ? getOptimizedImageUrl(recent.at(-1)?.image_url, "grid")
             : space.cover_url ? getOptimizedImageUrl(space.cover_url, "avatar") : null;
+          const latest = recent.at(-1);
+          const recentCrop = latest && validPresentation(latest.presentation) && latest.image_width && latest.image_height
+            ? circleThumbnailCrop(latest.presentation, latest.image_width, latest.image_height) : null;
           const initials = space.name.slice(0, 2).toUpperCase();
 
           const circle = (
             <div className={`w-16 h-16 rounded-full p-0.5 ring-2 transition-all ${recent.length > 0 ? "ring-black group-hover:ring-[3px]" : "ring-neutral-300 group-hover:ring-black"}`}>
               <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center text-white font-bold text-sm">
-                {cover ? <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" /> : <span>{initials}</span>}
+                {cover && recentCrop ? <PresentedPhoto src={cover} alt="" imageWidth={latest?.image_width}
+                  imageHeight={latest?.image_height} presentation={recentCrop} />
+                  : cover ? <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" /> : <span>{initials}</span>}
               </div>
             </div>
           );

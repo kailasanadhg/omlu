@@ -68,6 +68,17 @@ export interface MediaItem {
   position: number;
 }
 
+export type DisplayShape = "portrait_9_16" | "portrait_3_4" | "square" | "landscape_4_3" | "circle";
+
+/** Normalized rectangle within the original, uncropped image. */
+export interface MemoryPresentation {
+  display_shape: DisplayShape;
+  crop_x: number;
+  crop_y: number;
+  crop_width: number;
+  crop_height: number;
+}
+
 export interface Note {
   id: string;
   memory_id: string;
@@ -94,6 +105,7 @@ export interface Memory {
   memory_date: string;
   created_at: string;
   media_items: MediaItem[];
+  presentation?: MemoryPresentation | null;
   likes_count: number;
   is_liked_by_me: boolean;
   comments_count: number;

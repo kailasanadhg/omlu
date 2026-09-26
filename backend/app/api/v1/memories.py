@@ -19,12 +19,44 @@ from app.core.upload_sessions import lock_identity, verify_asset
 from app.models.like import Like
 from app.models.comment import Comment
 from app.models.note import Note
-from app.schemas.memory import MemoryCreate, MemoryOut, RecentSpaceMemoryOut, RecentSpaceMemoriesOut
+from app.schemas.memory import MemoryCreate, MemoryOut, MemoryPresentation, RecentSpaceMemoryOut, RecentSpaceMemoriesOut
 from app.schemas.media import MediaItemOut
 from app.schemas.note import NoteOut
 from app.api.deps import get_current_user, get_current_user_optional, require_space_read
 
 router = APIRouter()
+
+def memory_presentation(memory: Memory) -> Optional[MemoryPresentation]:
+    if not memory.display_shape:
+        return None
+    return MemoryPresentation(
+        display_shape=memory.display_shape,
+        crop_x=memory.crop_x,
+        crop_y=memory.crop_y,
+        crop_width=memory.crop_width,
+        crop_height=memory.crop_height,
+    )
+
+
+def presentation_columns(presentation: Optional[MemoryPresentation]) -> dict:
+    return presentation.model_dump() if presentation else {}
+
+
+def verify_presentation_aspect(presentation: Optional[MemoryPresentation], width: Optional[int], height: Optional[int]) -> None:
+    if not presentation:
+        return
+    if not width or not height or width <= 0 or height <= 0:
+        raise HTTPException(422, "Photo dimensions are required for a saved crop")
+    expected = {
+        "portrait_9_16": 9 / 16,
+        "portrait_3_4": 3 / 4,
+        "square": 1,
+        "landscape_4_3": 4 / 3,
+        "circle": 1,
+    }[presentation.display_shape]
+    actual = width * presentation.crop_width / (height * presentation.crop_height)
+    if abs(actual / expected - 1) > 0.01:
+        raise HTTPException(422, "Crop rectangle does not match the selected shape")
 
 async def memory_stats(ids: list[uuid.UUID], current_user_id: uuid.UUID, db: AsyncSession) -> dict:
     if not ids:
@@ -85,6 +117,7 @@ async def format_memory_out(memory: Memory, current_user_id: uuid.UUID, space_ow
         memory_date=memory.memory_date,
         created_at=memory.created_at,
         media_items=media_items_out,
+        presentation=memory_presentation(memory),
         likes_count=likes_count,
         is_liked_by_me=is_liked,
         comments_count=comments_count,
@@ -131,7 +164,8 @@ async def create_memory(
         "space_id": str(payload.space_id),
         "caption": payload.caption.strip() if payload.caption else None,
         "memory_date": str(payload.memory_date) if payload.memory_date else None,
-        "uploads": uploads_repr
+        "uploads": uploads_repr,
+        "presentation": payload.presentation.model_dump() if payload.presentation else None,
     }
     request_hash = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
@@ -169,13 +203,15 @@ async def create_memory(
             if any(u.memory_id for u in sessions):
                 raise HTTPException(status.HTTP_409_CONFLICT, "Media is already attached to another memory")
             assets = {u.id: await verify_asset(u) for u in sessions}
+            verify_presentation_aspect(payload.presentation, assets[ids[0]].get("width"), assets[ids[0]].get("height"))
             memory = Memory(
                 author_id=current_user.id,
                 space_id=space.id,
                 client_id=payload.client_id,
                 request_hash=request_hash,
                 caption=identity["caption"],
-                memory_date=payload.memory_date or datetime.now(timezone.utc).date()
+                memory_date=payload.memory_date or datetime.now(timezone.utc).date(),
+                **presentation_columns(payload.presentation),
             )
             db.add(memory)
             await db.flush()
@@ -199,13 +235,15 @@ async def create_memory(
                 session.memory_id = memory.id
             await db.commit()
         else:
+            verify_presentation_aspect(payload.presentation, payload.media_items[0].width, payload.media_items[0].height)
             memory = Memory(
                 author_id=current_user.id,
                 space_id=space.id,
                 client_id=payload.client_id,
                 request_hash=request_hash,
                 caption=identity["caption"],
-                memory_date=payload.memory_date or datetime.now(timezone.utc).date()
+                memory_date=payload.memory_date or datetime.now(timezone.utc).date(),
+                **presentation_columns(payload.presentation),
             )
             db.add(memory)
             await db.flush()
@@ -249,15 +287,18 @@ async def get_recent_space_memories(
     """Lightweight, read-only view of existing memories from the last 24 hours."""
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=24)
-    first_image = (
-        select(Media.secure_url)
-        .where(Media.memory_id == Memory.id)
-        .order_by(Media.position, Media.id)
-        .limit(1)
-        .scalar_subquery()
-    )
+    def first_media_value(column):
+        return (select(column).where(Media.memory_id == Memory.id)
+                .order_by(Media.position, Media.id).limit(1).scalar_subquery())
     stmt = (
-        select(Memory.id, Memory.space_id, Memory.created_at, first_image.label("image_url"))
+        select(
+            Memory.id, Memory.space_id, Memory.created_at,
+            Memory.display_shape, Memory.crop_x, Memory.crop_y,
+            Memory.crop_width, Memory.crop_height,
+            first_media_value(Media.secure_url).label("image_url"),
+            first_media_value(Media.width).label("image_width"),
+            first_media_value(Media.height).label("image_height"),
+        )
         .join(Membership, Membership.space_id == Memory.space_id)
         .where(
             Membership.user_id == current_user.id,
@@ -275,6 +316,15 @@ async def get_recent_space_memories(
                 space_id=row.space_id,
                 created_at=row.created_at,
                 image_url=row.image_url,
+                image_width=row.image_width,
+                image_height=row.image_height,
+                presentation=MemoryPresentation(
+                    display_shape=row.display_shape,
+                    crop_x=row.crop_x,
+                    crop_y=row.crop_y,
+                    crop_width=row.crop_width,
+                    crop_height=row.crop_height,
+                ) if row.display_shape else None,
             )
             for row in rows
         ],

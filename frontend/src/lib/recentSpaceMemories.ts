@@ -1,8 +1,13 @@
+import type { MemoryPresentation } from "@/types";
+
 export interface RecentSpaceMemory {
   id: string;
   space_id: string;
   created_at: string;
   image_url: string | null;
+  image_width?: number | null;
+  image_height?: number | null;
+  presentation?: MemoryPresentation | null;
 }
 
 export interface RecentSpaceMemoriesResponse {
