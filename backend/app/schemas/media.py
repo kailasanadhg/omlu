@@ -7,6 +7,11 @@ class CloudinarySignRequest(BaseModel):
     purpose: Literal["memory", "avatar", "space_cover"]
     space_id: Optional[uuid.UUID] = None
 
+class GuestCloudinarySignRequest(BaseModel):
+    guest_token: str
+    upload_session_id: Optional[uuid.UUID] = None
+
+
 class CloudinarySignResponse(BaseModel):
     upload_session_id: Optional[uuid.UUID] = None
     overwrite: Optional[bool] = None

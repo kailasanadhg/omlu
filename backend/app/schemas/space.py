@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field, ConfigDict
 class SpaceVisibilityUpdate(BaseModel):
     visibility: Literal["public", "private"]
 
+class SpaceGuestSettingsUpdate(BaseModel):
+    guest_uploads_enabled: bool
+
 class SpaceCreate(BaseModel):
     visibility: Literal["public", "private"] = "private"
     name: str = Field(..., min_length=2, max_length=100)
@@ -20,6 +23,8 @@ class SpaceOut(BaseModel):
     cover_url: Optional[str] = None
     owner_id: uuid.UUID
     invite_code: str
+    guest_uploads_enabled: bool = False
+    guest_token: Optional[str] = None
     members_count: int = 0
     memories_count: int = 0
     is_owner: bool = False
@@ -48,3 +53,12 @@ class InvitePreviewOut(BaseModel):
     memories_count: int = 0
     invite_code: str
     is_member: bool = False
+
+class GuestSpacePreviewOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    guest_session_id: uuid.UUID
+    guest_claim_token: str
+

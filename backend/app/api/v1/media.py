@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -7,12 +7,61 @@ from app.core.cloudinary_service import cloudinary_service
 from app.models.user import User
 from app.models.space import Space
 from app.models.membership import Membership
-from app.schemas.media import CloudinarySignRequest, CloudinarySignResponse
+from app.schemas.media import CloudinarySignRequest, GuestCloudinarySignRequest, CloudinarySignResponse
 from app.api.deps import get_current_user
 from app.models.upload_session import UploadSession
 from app.core.upload_sessions import lock_identity, verify_asset
+from app.core.rate_limit import rate_limiter, get_client_ip
 
 router = APIRouter()
+
+@router.post("/guest-cloudinary-sign", response_model=CloudinarySignResponse)
+async def get_guest_cloudinary_signature(
+    payload: GuestCloudinarySignRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    # Rate limit by client IP and guest token
+    client_ip = get_client_ip(request)
+    rate_limiter.check(f"guest_sign_ip:{client_ip}", max_requests=30, window_seconds=300, detail="Too many upload requests. Please wait a few minutes.")
+    rate_limiter.check(f"guest_sign_token:{payload.guest_token}", max_requests=60, window_seconds=300, detail="Too many upload requests for this space link. Please wait a few minutes.")
+
+    # Validate guest token
+    stmt = select(Space).where(Space.guest_token == payload.guest_token.strip())
+    space = (await db.execute(stmt)).scalar_one_or_none()
+    if not space:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or revoked guest link"
+        )
+    if not space.guest_uploads_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Guest uploads are currently disabled for this Space"
+        )
+
+    folder = f"omlu/spaces/{space.id}/memories"
+    session_id = payload.upload_session_id or uuid.uuid4()
+    await lock_identity(db, f"upload:{session_id}")
+    session = await db.get(UploadSession, session_id)
+    if session is None:
+        session = UploadSession(
+            id=session_id,
+            user_id=None,
+            space_id=space.id,
+            public_id=f"{folder}/{session_id.hex}",
+            is_guest=True
+        )
+        db.add(session)
+        await db.flush()
+    if not session.is_guest or session.space_id != space.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Upload session does not belong to this guest Space")
+    if session.memory_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Upload session already attached to a memory")
+
+    sig_data = cloudinary_service.generate_upload_signature(folder, session_id.hex, immutable=True)
+    return CloudinarySignResponse(**sig_data, upload_session_id=session.id)
+
 
 @router.post("/cloudinary-sign", response_model=CloudinarySignResponse)
 async def get_cloudinary_signature(

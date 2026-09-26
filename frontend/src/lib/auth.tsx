@@ -10,7 +10,15 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (emailOrUsername: string, password: string) => Promise<User>;
-  signup: (email: string, username: string, displayName: string, password: string) => Promise<User>;
+  signup: (
+    email: string,
+    username: string,
+    displayName: string,
+    password: string,
+    guestSessionId?: string | null,
+    guestClaimToken?: string | null
+  ) => Promise<User>;
+  claimGuestMemories: (guestSessionId: string, guestClaimToken: string) => Promise<{ claimed_count: number }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateUserContext: (updatedUser: Partial<User>) => void;
@@ -102,7 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     username: string,
     displayName: string,
-    password: string
+    password: string,
+    guestSessionId?: string | null,
+    guestClaimToken?: string | null
   ): Promise<User> => {
     const res = await apiRequest<{ access_token: string; user: User }>("/auth/signup", {
       method: "POST",
@@ -111,12 +121,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         username,
         display_name: displayName,
         password,
+        guest_session_id: guestSessionId || undefined,
+        guest_claim_token: guestClaimToken || undefined,
       }),
     });
     localStorage.setItem("omlu_token", res.access_token);
     setToken(res.access_token);
     setUser(res.user);
+    if (guestSessionId && typeof window !== "undefined") {
+      localStorage.removeItem("omlu_guest_session");
+    }
     return res.user;
+  };
+
+  const claimGuestMemories = async (
+    guestSessionId: string,
+    guestClaimToken: string
+  ): Promise<{ claimed_count: number }> => {
+    const res = await apiRequest<{ claimed_count: number; message: string }>("/auth/claim-guest", {
+      method: "POST",
+      body: JSON.stringify({
+        guest_session_id: guestSessionId,
+        guest_claim_token: guestClaimToken,
+      }),
+    });
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("omlu_guest_session");
+    }
+    return { claimed_count: res.claimed_count };
   };
 
   const logout = () => {
@@ -148,6 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         signup,
+        claimGuestMemories,
         logout,
         refreshUser,
         updateUserContext,

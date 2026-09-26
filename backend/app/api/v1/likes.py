@@ -54,8 +54,8 @@ async def toggle_like(
         db.add(new_like)
         is_liked = True
 
-        # Notify author if not self
-        if memory.author_id != current_user.id:
+        # Notify author if not self and author exists
+        if memory.author_id and memory.author_id != current_user.id:
             notif = Notification(
                 user_id=memory.author_id,
                 actor_id=current_user.id,

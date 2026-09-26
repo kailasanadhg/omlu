@@ -10,8 +10,18 @@ from app.core.security import (
     validate_username
 )
 from app.models.user import User
-from app.schemas.auth import SignupRequest, LoginRequest, Token, UserOut
+from app.models.memory import Memory
+from app.models.membership import Membership
+from app.schemas.auth import (
+    SignupRequest,
+    ClaimGuestRequest,
+    ClaimGuestResponse,
+    LoginRequest,
+    Token,
+    UserOut,
+)
 from app.api.deps import get_current_user
+from app.core.guest_session import verify_guest_claim_token
 
 router = APIRouter()
 
@@ -57,13 +67,70 @@ async def signup(payload: SignupRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(user)
 
-    # 5. Issue token
+    # 5. Safely claim any eligible guest uploads from this verified guest session
+    if payload.guest_session_id and payload.guest_claim_token:
+        if verify_guest_claim_token(payload.guest_session_id, payload.guest_claim_token):
+            stmt = select(Memory).where(
+                Memory.guest_session_id == payload.guest_session_id,
+                Memory.contributor_user_id.is_(None)
+            )
+            guest_memories = (await db.execute(stmt)).scalars().all()
+            for m in guest_memories:
+                m.contributor_user_id = user.id
+                # CRITICAL: Preserve guest attribution permanently:
+                m.author_id = None
+                m.is_guest = True
+                mem_check = await db.scalar(
+                    select(Membership.id).where(
+                        Membership.space_id == m.space_id,
+                        Membership.user_id == user.id
+                    )
+                )
+                if not mem_check:
+                    db.add(Membership(user_id=user.id, space_id=m.space_id, role="member"))
+            if guest_memories:
+                await db.commit()
+
+    # 6. Issue token
     access_token = create_access_token(data={"sub": str(user.id)})
     return Token(
         access_token=access_token,
         token_type="bearer",
         user=UserOut.model_validate(user)
     )
+
+@router.post("/claim-guest", response_model=ClaimGuestResponse)
+async def claim_guest_memories(
+    payload: ClaimGuestRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if not verify_guest_claim_token(payload.guest_session_id, payload.guest_claim_token):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid guest claim token")
+
+    stmt = select(Memory).where(
+        Memory.guest_session_id == payload.guest_session_id,
+        Memory.contributor_user_id.is_(None)
+    )
+    guest_memories = (await db.execute(stmt)).scalars().all()
+    for m in guest_memories:
+        m.contributor_user_id = current_user.id
+        # CRITICAL: Preserve guest attribution permanently:
+        m.author_id = None
+        m.is_guest = True
+        mem_check = await db.scalar(
+            select(Membership.id).where(
+                Membership.space_id == m.space_id,
+                Membership.user_id == current_user.id
+            )
+        )
+        if not mem_check:
+            db.add(Membership(user_id=current_user.id, space_id=m.space_id, role="member"))
+    if guest_memories:
+        await db.commit()
+
+    return ClaimGuestResponse(claimed_count=len(guest_memories))
+
 
 @router.post("/login", response_model=Token)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):

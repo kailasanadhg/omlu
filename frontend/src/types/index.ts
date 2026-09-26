@@ -27,11 +27,22 @@ export interface Space {
   cover_url?: string | null;
   owner_id: string;
   invite_code: string;
+  guest_uploads_enabled?: boolean;
+  guest_token?: string | null;
   members_count: number;
   memories_count: number;
   is_owner: boolean;
   is_member: boolean;
   created_at: string;
+}
+
+export interface GuestSpacePreview {
+  id: string;
+  name: string;
+  description?: string | null;
+  cover_url?: string | null;
+  guest_session_id: string;
+  guest_claim_token: string;
 }
 
 export interface SpaceMember {
@@ -97,10 +108,11 @@ export interface Memory {
   client_id?: string | null;
   space_id: string;
   space_name: string;
-  author_id: string;
-  author_username: string;
+  author_id?: string | null;
+  author_username?: string | null;
   author_display_name: string;
   author_avatar_url?: string | null;
+  is_guest?: boolean;
   caption?: string | null;
   memory_date: string;
   created_at: string;

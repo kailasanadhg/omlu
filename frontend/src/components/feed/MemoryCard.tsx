@@ -105,20 +105,36 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-3.5 py-3">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <Link href={`/u/${memory.author_username}`} className="shrink-0">
-            <Avatar
-              src={memory.author_avatar_url}
-              name={memory.author_display_name}
-              size="sm"
-            />
-          </Link>
-          <div className="flex items-center gap-1.5 truncate text-xs">
-            <Link
-              href={`/u/${memory.author_username}`}
-              className="font-bold text-neutral-900 hover:underline truncate"
-            >
-              @{memory.author_username}
+          {memory.is_guest || !memory.author_username ? (
+            <div className="shrink-0">
+              <Avatar
+                src={memory.author_avatar_url}
+                name={memory.author_display_name || "Guest"}
+                size="sm"
+              />
+            </div>
+          ) : (
+            <Link href={`/u/${memory.author_username}`} className="shrink-0">
+              <Avatar
+                src={memory.author_avatar_url}
+                name={memory.author_display_name}
+                size="sm"
+              />
             </Link>
+          )}
+          <div className="flex items-center gap-1.5 truncate text-xs">
+            {memory.is_guest || !memory.author_username ? (
+              <span className="font-bold text-neutral-900 truncate">
+                {memory.author_display_name || "Guest"}
+              </span>
+            ) : (
+              <Link
+                href={`/u/${memory.author_username}`}
+                className="font-bold text-neutral-900 hover:underline truncate"
+              >
+                @{memory.author_username}
+              </Link>
+            )}
             <span className="text-neutral-400">·</span>
             <Link
               href={`/spaces/${memory.space_id}`}
@@ -243,12 +259,16 @@ export function MemoryCard({ memory, onDelete }: MemoryCardProps) {
         {/* Caption */}
         {memory.caption && (
           <div className="text-xs text-neutral-900 leading-snug mb-1">
-            <Link
-              href={`/u/${memory.author_username}`}
-              className="font-bold mr-1.5 hover:underline"
-            >
-              @{memory.author_username}
-            </Link>
+            {memory.is_guest || !memory.author_username ? (
+              <span className="font-bold mr-1.5">{memory.author_display_name || "Guest"}</span>
+            ) : (
+              <Link
+                href={`/u/${memory.author_username}`}
+                className="font-bold mr-1.5 hover:underline"
+              >
+                @{memory.author_username}
+              </Link>
+            )}
             <span className="whitespace-pre-line">{memory.caption}</span>
           </div>
         )}

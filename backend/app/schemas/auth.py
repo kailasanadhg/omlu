@@ -8,6 +8,15 @@ class SignupRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=30)
     display_name: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=6, max_length=128)
+    guest_session_id: Optional[uuid.UUID] = None
+    guest_claim_token: Optional[str] = None
+
+class ClaimGuestRequest(BaseModel):
+    guest_session_id: uuid.UUID
+    guest_claim_token: str
+
+class ClaimGuestResponse(BaseModel):
+    claimed_count: int
 
 class LoginRequest(BaseModel):
     email_or_username: str

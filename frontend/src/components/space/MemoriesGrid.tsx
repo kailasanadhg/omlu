@@ -20,14 +20,18 @@ export function MemoriesGrid({ memories, onMemoryDeleted }: { memories: Memory[]
     <div className="memory-masonry">
       {memories.map((memory) => {
         return <div key={memory.id} className={`memory-tile ${memory.presentation?.display_shape === "circle" ? "memory-tile--circle" : ""}`}>
-        <button className="block w-full text-left" onClick={() => setSelected(memory)} aria-label={`Open memory by @${memory.author_username} in ${memory.space_name}`}>
+        <button className="block w-full text-left" onClick={() => setSelected(memory)} aria-label={`Open memory by ${memory.is_guest || !memory.author_username ? (memory.author_display_name || "Guest") : `@${memory.author_username}`} in ${memory.space_name}`}>
           <div className="memory-tile-photo">
             <MemoryImage item={memory.media_items?.[0]} alt={memory.caption || `Memory in ${memory.space_name}`} presentation={memory.presentation} />
           </div>
           {memory.is_optimistic && <span className="text-xs">{memory.upload_status === "failed" ? "Upload failed — open to retry" : "Uploading…"}</span>}
         </button>
         <div className="flex justify-between gap-2 text-xs text-neutral-600 pt-2">
-          <Link href={`/u/${memory.author_username}`} className="truncate">@{memory.author_username}</Link>
+          {memory.is_guest || !memory.author_username ? (
+            <span className="truncate">{memory.author_display_name || "Guest"}</span>
+          ) : (
+            <Link href={`/u/${memory.author_username}`} className="truncate">@{memory.author_username}</Link>
+          )}
           <Link href={`/spaces/${memory.space_id}`} className="truncate">{memory.space_name}</Link>
         </div>
       </div>; })}

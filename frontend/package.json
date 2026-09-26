@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/photo_pipeline_client.test.cjs && node tests/recent_space_memories.test.mjs && node tests/presentation.test.mjs",
+    "test": "node tests/photo_pipeline_client.test.cjs && node tests/recent_space_memories.test.mjs && node tests/presentation.test.mjs && node tests/guest_uploads.test.mjs",
     "test:browser": "node tests/space_first_browser.cjs"
   },
   "dependencies": {

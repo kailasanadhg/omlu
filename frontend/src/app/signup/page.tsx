@@ -21,6 +21,27 @@ function SignupForm() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Guest claim params from URL or localStorage
+  const [guestSession] = useState<{ id: string; token: string } | null>(() => {
+    const urlSession = searchParams.get("guest_session");
+    const urlToken = searchParams.get("claim_token");
+    if (urlSession && urlToken) {
+      return { id: urlSession, token: urlToken };
+    }
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("omlu_guest_session");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.guest_session_id && parsed?.guest_claim_token) {
+            return { id: parsed.guest_session_id, token: parsed.guest_claim_token };
+          }
+        }
+      } catch {}
+    }
+    return null;
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!displayName || !username || !email || !password) {
@@ -43,7 +64,14 @@ function SignupForm() {
     setIsLoading(true);
 
     try {
-      await signup(email.trim().toLowerCase(), cleanUsername, displayName.trim(), password);
+      await signup(
+        email.trim().toLowerCase(),
+        cleanUsername,
+        displayName.trim(),
+        password,
+        guestSession?.id,
+        guestSession?.token
+      );
       router.push(returnTo);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create account. Please try again.";
@@ -63,6 +91,11 @@ function SignupForm() {
         <p className="text-xs text-neutral-500 font-medium italic">
           Our Memories Link Us.
         </p>
+        {guestSession && (
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+            <span>✨ Memories will be saved to your account</span>
+          </div>
+        )}
       </div>
 
       {/* Form */}

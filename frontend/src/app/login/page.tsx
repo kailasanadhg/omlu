@@ -12,7 +12,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("return_to") || "/";
 
-  const { login } = useAuth();
+  const { login, claimGuestMemories } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +31,17 @@ function LoginForm() {
 
     try {
       await login(identifier, password);
+      try {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("omlu_guest_session") : null;
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.guest_session_id && parsed?.guest_claim_token) {
+            await claimGuestMemories(parsed.guest_session_id, parsed.guest_claim_token);
+          }
+        }
+      } catch (claimErr) {
+        console.warn("Failed to claim guest session upon login:", claimErr);
+      }
       router.push(returnTo);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Invalid credentials. Please try again.";

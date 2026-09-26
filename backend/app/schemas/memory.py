@@ -27,15 +27,26 @@ class MemoryCreate(BaseModel):
     media_items: List[MediaItemCreate] = Field(..., min_length=1, max_length=10)
     presentation: Optional[MemoryPresentation] = None
 
+class GuestMemoryCreate(BaseModel):
+    guest_token: str
+    client_id: Optional[uuid.UUID] = None
+    caption: Optional[str] = Field(None, max_length=2200)
+    memory_date: Optional[date] = None
+    media_items: List[MediaItemCreate] = Field(..., min_length=1, max_length=10)
+    presentation: Optional[MemoryPresentation] = None
+    guest_session_id: Optional[uuid.UUID] = None
+    guest_claim_token: Optional[str] = None
+
 class MemoryOut(BaseModel):
     client_id: Optional[uuid.UUID] = None
     id: uuid.UUID
     space_id: uuid.UUID
     space_name: str
-    author_id: uuid.UUID
-    author_username: str
-    author_display_name: str
+    author_id: Optional[uuid.UUID] = None
+    author_username: Optional[str] = None
+    author_display_name: str = "Guest"
     author_avatar_url: Optional[str] = None
+    is_guest: bool = False
     caption: Optional[str] = None
     memory_date: date
     created_at: datetime

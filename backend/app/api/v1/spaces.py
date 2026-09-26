@@ -10,14 +10,28 @@ from app.models.space import Space
 from app.models.membership import Membership
 from app.models.memory import Memory
 from app.models.notification import Notification
-from app.schemas.space import SpaceVisibilityUpdate, SpaceCreate, SpaceOut, SpaceMemberOut, InvitePreviewOut
+from app.schemas.space import (
+    SpaceVisibilityUpdate,
+    SpaceGuestSettingsUpdate,
+    SpaceCreate,
+    SpaceOut,
+    SpaceMemberOut,
+    InvitePreviewOut,
+    GuestSpacePreviewOut,
+)
 from app.api.deps import get_current_user, get_current_user_optional
+from app.core.guest_session import create_guest_session
 
 router = APIRouter()
 
 def generate_invite_code() -> str:
     """Generate a clean, URL-safe 12-character cryptographic token."""
     return secrets.token_urlsafe(9)
+
+def generate_guest_token() -> str:
+    """Generate a secure, cryptographically unguessable guest contribution token."""
+    return secrets.token_urlsafe(24)
+
 
 @router.post("", response_model=SpaceOut, status_code=status.HTTP_201_CREATED)
 async def create_space(
@@ -57,6 +71,8 @@ async def create_space(
         cover_url=space.cover_url,
         owner_id=space.owner_id,
         invite_code=space.invite_code,
+        guest_uploads_enabled=space.guest_uploads_enabled,
+        guest_token=space.guest_token,
         members_count=1,
         memories_count=0,
         is_owner=True,
@@ -99,6 +115,8 @@ async def list_my_spaces(
             cover_url=space.cover_url,
             owner_id=space.owner_id,
             invite_code=space.invite_code,
+            guest_uploads_enabled=space.guest_uploads_enabled,
+            guest_token=space.guest_token if ((space.owner_id == current_user.id) or space.guest_uploads_enabled) else None,
             members_count=m_count,
             memories_count=mem_count,
             is_owner=(space.owner_id == current_user.id),
@@ -107,6 +125,35 @@ async def list_my_spaces(
         ))
 
     return output
+
+@router.get("/guest/{guest_token}", response_model=GuestSpacePreviewOut)
+async def preview_guest_space(
+    guest_token: str,
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(Space).where(Space.guest_token == guest_token.strip())
+    space = (await db.execute(stmt)).scalar_one_or_none()
+    if not space:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid or revoked guest link"
+        )
+    if not space.guest_uploads_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Guest uploads are currently disabled for this Space"
+        )
+
+    session_id, claim_token = create_guest_session()
+    return GuestSpacePreviewOut(
+        id=space.id,
+        name=space.name,
+        description=space.description,
+        cover_url=space.cover_url,
+        guest_session_id=session_id,
+        guest_claim_token=claim_token
+    )
+
 
 @router.get("/join/{code}", response_model=InvitePreviewOut)
 async def preview_invite(
@@ -194,6 +241,7 @@ async def join_space(
     m_count = (await db.execute(m_count_stmt)).scalar_one() or 0
     mem_count = (await db.execute(mem_count_stmt)).scalar_one() or 0
 
+    is_owner = (space.owner_id == current_user.id)
     return SpaceOut(
         id=space.id,
         name=space.name,
@@ -202,9 +250,11 @@ async def join_space(
         cover_url=space.cover_url,
         owner_id=space.owner_id,
         invite_code=space.invite_code,
+        guest_uploads_enabled=space.guest_uploads_enabled,
+        guest_token=space.guest_token if (is_owner or space.guest_uploads_enabled) else None,
         members_count=m_count,
         memories_count=mem_count,
-        is_owner=(space.owner_id == current_user.id),
+        is_owner=is_owner,
         is_member=True,
         created_at=space.created_at
     )
@@ -237,6 +287,9 @@ async def get_space(
     m_count = (await db.execute(m_count_stmt)).scalar_one() or 0
     mem_count = (await db.execute(mem_count_stmt)).scalar_one() or 0
 
+    is_owner = (space.owner_id == (current_user.id if current_user else None))
+    is_member = membership is not None
+
     return SpaceOut(
         id=space.id,
         name=space.name,
@@ -244,11 +297,13 @@ async def get_space(
         description=space.description,
         cover_url=space.cover_url,
         owner_id=space.owner_id,
-        invite_code=space.invite_code if membership else "",
+        invite_code=space.invite_code if is_member else "",
+        guest_uploads_enabled=space.guest_uploads_enabled,
+        guest_token=space.guest_token if (is_owner or (is_member and space.guest_uploads_enabled)) else None,
         members_count=m_count,
         memories_count=mem_count,
-        is_owner=(space.owner_id == (current_user.id if current_user else None)),
-        is_member=membership is not None,
+        is_owner=is_owner,
+        is_member=is_member,
         created_at=space.created_at
     )
 
@@ -341,3 +396,43 @@ async def update_space_visibility(space_id: uuid.UUID, payload: SpaceVisibilityU
     space.visibility = payload.visibility
     await db.commit()
     return await get_space(space_id, current_user, db)
+
+@router.patch("/{space_id}/guest-settings", response_model=SpaceOut)
+async def update_guest_settings(
+    space_id: uuid.UUID,
+    payload: SpaceGuestSettingsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    space = await db.get(Space, space_id)
+    if not space:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
+    if space.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the Space owner can change guest upload settings")
+
+    space.guest_uploads_enabled = payload.guest_uploads_enabled
+    if payload.guest_uploads_enabled and not space.guest_token:
+        space.guest_token = generate_guest_token()
+
+    await db.commit()
+    await db.refresh(space)
+    return await get_space(space_id, current_user, db)
+
+@router.post("/{space_id}/regenerate-guest-link", response_model=SpaceOut)
+async def regenerate_guest_link(
+    space_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    space = await db.get(Space, space_id)
+    if not space:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
+    if space.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the Space owner can regenerate the guest link")
+
+    space.guest_token = generate_guest_token()
+    space.guest_uploads_enabled = True
+    await db.commit()
+    await db.refresh(space)
+    return await get_space(space_id, current_user, db)
+

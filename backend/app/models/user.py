@@ -28,6 +28,6 @@ class User(Base):
 
     spaces_owned: Mapped[List["Space"]] = relationship("Space", back_populates="owner", cascade="all, delete-orphan")
     memberships: Mapped[List["Membership"]] = relationship("Membership", back_populates="user", cascade="all, delete-orphan")
-    memories: Mapped[List["Memory"]] = relationship("Memory", back_populates="author", cascade="all, delete-orphan")
+    memories: Mapped[List["Memory"]] = relationship("Memory", foreign_keys="[Memory.author_id]", back_populates="author", cascade="all, delete-orphan")
     likes: Mapped[List["Like"]] = relationship("Like", back_populates="user", cascade="all, delete-orphan")
     comments: Mapped[List["Comment"]] = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
