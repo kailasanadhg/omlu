@@ -69,3 +69,20 @@ select:-webkit-autofill:focus {
 @media (min-width: 1440px) { .memory-masonry { columns: 5; } }
 .memory-dialog { margin: auto; width: min(760px, 95vw); max-height: 90dvh; padding: 0; border: 0; border-radius: 12px; }
 .memory-dialog::backdrop { background: rgb(0 0 0 / .75); }
+
+/* Home Drops keep the saved wall footprint while rotating in place. */
+.home-drop-button { display: block; width: 100%; padding: 0; border: 0; background: transparent; perspective: 900px; cursor: pointer; touch-action: pan-y; }
+.memory-tile--circle .home-drop-button { width: 90%; margin-inline: auto; }
+.home-drop-flipper { display: block; position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 380ms cubic-bezier(.2,.7,.2,1), filter 180ms; }
+.home-drop-flipper.is-flipped { transform: rotateY(180deg); }
+.home-drop-flipper.is-lifting { filter: drop-shadow(0 8px 12px rgb(0 0 0 / .2)); }
+.home-drop-face { position: absolute; inset: 0; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 9px; }
+.memory-tile--circle .home-drop-face { border-radius: 50%; }
+.home-drop-face .relative { height: 100%; }
+.home-drop-back { transform: rotateY(180deg); background: #eee8d9; color: #171717; border: 1px solid #ddd5c5; box-shadow: inset 0 0 16px rgb(0 0 0 / .025); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(8px, 8%, 22px); padding: 10%; text-align: center; }
+.home-drop-author { font-size: clamp(12px, 1.3vw, 17px); font-weight: 650; overflow-wrap: anywhere; }
+.home-drop-details { display: flex; flex-direction: column; gap: 3px; font-size: clamp(10px, 1vw, 13px); overflow-wrap: anywhere; }
+.home-photo-viewer { position: fixed; inset: 0; z-index: 80; background: rgb(8 8 8 / .96); display: flex; align-items: center; justify-content: center; padding: 42px 12px 20px; }
+.home-photo-original { display: block; max-width: 100%; max-height: calc(100dvh - 62px); object-fit: contain; }
+.home-photo-close { position: absolute; top: 10px; right: 12px; z-index: 1; width: 36px; height: 36px; border-radius: 50%; color: white; background: rgb(255 255 255 / .15); font-size: 26px; line-height: 1; }
+@media (prefers-reduced-motion: reduce) { .home-drop-flipper { transition: none; } }

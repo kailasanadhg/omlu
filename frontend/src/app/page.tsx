@@ -83,7 +83,7 @@ export default function HomePage() {
         <p className="px-4 py-16 text-center text-sm text-neutral-600">No memories yet. Add a moment to a Space to begin.</p>
       ) : (
         <>
-          <MemoriesGrid memories={feed} onMemoryDeleted={id => {
+          <MemoriesGrid home memories={feed} onMemoryDeleted={id => {
             setFeed(items => items.filter(item => item.id !== id));
             refreshHome();
           }} />

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { Memory } from "@/types";
 import { MemoryImage } from "../ui/MemoryImage";
 import { MemoryCard } from "../feed/MemoryCard";
+import { HomeDrop } from "../feed/HomeDrop";
 
-export function MemoriesGrid({ memories, onMemoryDeleted }: { memories: Memory[]; onMemoryDeleted?: (id: string) => void }) {
+export function MemoriesGrid({ memories, onMemoryDeleted, home = false }: { memories: Memory[]; onMemoryDeleted?: (id: string) => void; home?: boolean }) {
   const [selected, setSelected] = useState<Memory | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -19,7 +20,7 @@ export function MemoriesGrid({ memories, onMemoryDeleted }: { memories: Memory[]
   return <>
     <div className="memory-masonry">
       {memories.map((memory) => {
-        return <div key={memory.id} className={`memory-tile ${memory.presentation?.display_shape === "circle" ? "memory-tile--circle" : ""}`}>
+        return home ? <HomeDrop key={memory.id} memory={memory} /> : <div key={memory.id} className={`memory-tile ${memory.presentation?.display_shape === "circle" ? "memory-tile--circle" : ""}`}>
         <button className="block w-full text-left" onClick={() => setSelected(memory)} aria-label={`Open memory by ${memory.is_guest || !memory.author_username ? (memory.author_display_name || "Guest") : `@${memory.author_username}`} in ${memory.space_name}`}>
           <div className="memory-tile-photo">
             <MemoryImage item={memory.media_items?.[0]} alt={memory.caption || `Memory in ${memory.space_name}`} presentation={memory.presentation} />
