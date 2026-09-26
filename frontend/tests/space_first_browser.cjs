@@ -6,6 +6,7 @@ const base = process.env.TEST_FRONTEND_URL || 'http://localhost:3107';
 const user = {id:'u1',username:'tester',display_name:'Tester',email:'tester@example.com'};
 const space = {id:'s1',name:'Mountain archive',visibility:'public',members_count:2,memories_count:31,is_member:true,is_owner:true,invite_code:'invite',owner_id:'u1'};
 const memory = n => ({id:`m${n}`,space_id:'s1',space_name:space.name,author_id:'u1',author_username:'tester',author_display_name:'Tester',caption:`Memory ${n}`,memory_date:'2026-09-01',created_at:'2026-09-01T00:00:00Z',likes_count:0,comments_count:0,notes:[],can_contribute:true,media_items:[{secure_url:`https://images.example.test/${n===1?'broken':n}.jpg`,width:800,height:n%2?1200:600}]});
+const recentMemory = {...memory(1), created_at:'2026-09-26T11:00:00Z'};
 (async () => {
  const browser = await chromium.launch({headless:true});
  const page = await browser.newPage({viewport:{width:1440,height:1000}});
@@ -18,16 +19,18 @@ const memory = n => ({id:`m${n}`,space_id:'s1',space_name:space.name,author_id:'
    const url = new URL(route.request().url()); const path=url.pathname.replace('/api/v1','');
    const send = (json, status=200) => route.fulfill({status,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(json)});
    if (path==='/auth/me') return send(authMode==='ok'?user:{detail:'Temporary outage'}, authMode==='ok'?200:503);
+   if (path==='/memories/feed') return send([recentMemory,memory(2)]);
+   if (path==='/memories/recent-spaces') return send({server_time:'2026-09-26T12:00:00Z',memories:[{id:'m1',space_id:'s1',created_at:recentMemory.created_at,image_url:recentMemory.media_items[0].secure_url}]});
    if (path==='/spaces') { requests++; if(mode==='loading') await slowSpaces; return send(mode==='error'?{detail:'Unavailable'}:mode==='empty'?[]:[space],mode==='error'?503:200); }
    if(path==='/spaces/s1') return send(space);
    if(path==='/spaces/s1/members') return send([]);
-   if(path==='/memories/space/s1') return send(url.searchParams.has('before')?[memory(31)]:Array.from({length:30},(_,i)=>memory(i+1)));
+   if(path==='/memories/space/s1') return send(url.searchParams.has('before')?[memory(31)]:[recentMemory,...Array.from({length:29},(_,i)=>memory(i+2))]);
    if(path==='/users/@tester') return send({...user,is_self:true,memories_count:1,spaces_count:1});
    if(path==='/memories/user/u1') return send([memory(1)]);
    if(path.endsWith('/comments')) return send([]);
    return send({detail:'Unexpected test request'},404);
  });
- await page.goto(base);
+ await page.goto(base+'/spaces');
  await page.getByText('Loading spaces...').waitFor();
  resolveSpaces();
  await page.getByRole('heading',{name:'Your Spaces'}).waitFor();
@@ -35,6 +38,15 @@ const memory = n => ({id:`m${n}`,space_id:'s1',space_name:space.name,author_id:'
  assert.ok(await page.locator('main').evaluate(e=>e.getBoundingClientRect().width)>1000);
  assert.equal(requests,1,'Space list request deduplicated');
  console.log('PASS loading, successful existing Space rendering, wide desktop, request count');
+ await page.goto(base);
+ await page.getByRole('heading',{name:'Memories'}).waitFor();
+ assert.equal(await page.locator('.memory-tile').count(),2,'Home wall keeps old and new memories');
+ await page.getByRole('button',{name:/View 1 recent memory in Mountain archive/}).click();
+ await page.getByRole('dialog',{name:/Recent memories in Mountain archive/}).waitFor();
+ await page.getByRole('link',{name:'View full Space'}).click();
+ await page.getByRole('heading',{name:space.name}).waitFor();
+ console.log('PASS active Space circle, existing Drop viewer, full Space access, permanent Home wall');
+ await page.goto(base+'/spaces');
  mode='error'; await page.reload(); await page.getByRole('alert').filter({hasText:/Couldn’t/}).waitFor();
  assert.equal(await page.getByText('No Spaces yet').count(),0);
  mode='empty'; await page.getByRole('button',{name:'Try again'}).click(); await page.getByText('No Spaces yet').waitFor();
@@ -57,7 +69,11 @@ const memory = n => ({id:`m${n}`,space_id:'s1',space_name:space.name,author_id:'
  assert.equal(await page.locator('.memory-masonry').evaluate(e=>getComputedStyle(e).columnCount),'2');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  if(process.env.TEST_SCREENSHOT_DIR) await page.screenshot({path:process.env.TEST_SCREENSHOT_DIR+'/mobile.png',fullPage:true});
- console.log('PASS two-column mobile layout without horizontal overflow');
+ for (const width of [430,768]) {
+   await page.setViewportSize({width,height:844});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`no horizontal overflow at ${width}px`);
+ }
+ console.log('PASS 390px, 430px, and 768px responsive layouts without horizontal overflow');
  await page.goto(base+'/u/tester'); await page.getByText('public memories',{exact:true}).waitFor();
  assert.equal(await page.locator('.memory-tile').count(),1);
  assert.equal(await page.getByText('Never public').count(),0);

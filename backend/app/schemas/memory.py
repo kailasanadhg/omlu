@@ -38,3 +38,15 @@ class LikeToggleOut(BaseModel):
     memory_id: uuid.UUID
     is_liked: bool
     likes_count: int
+
+
+class RecentSpaceMemoryOut(BaseModel):
+    id: uuid.UUID
+    space_id: uuid.UUID
+    created_at: datetime
+    image_url: Optional[str] = None
+
+
+class RecentSpaceMemoriesOut(BaseModel):
+    server_time: datetime
+    memories: List[RecentSpaceMemoryOut]

@@ -1,7 +1,7 @@
 import uuid
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, func, and_
@@ -19,7 +19,7 @@ from app.core.upload_sessions import lock_identity, verify_asset
 from app.models.like import Like
 from app.models.comment import Comment
 from app.models.note import Note
-from app.schemas.memory import MemoryCreate, MemoryOut
+from app.schemas.memory import MemoryCreate, MemoryOut, RecentSpaceMemoryOut, RecentSpaceMemoriesOut
 from app.schemas.media import MediaItemOut
 from app.schemas.note import NoteOut
 from app.api.deps import get_current_user, get_current_user_optional, require_space_read
@@ -241,10 +241,52 @@ async def create_memory(
 
     return await format_memory_out(loaded_memory, current_user.id, space.owner_id, db)
 
+@router.get("/recent-spaces", response_model=RecentSpaceMemoriesOut)
+async def get_recent_space_memories(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight, read-only view of existing memories from the last 24 hours."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=24)
+    first_image = (
+        select(Media.secure_url)
+        .where(Media.memory_id == Memory.id)
+        .order_by(Media.position, Media.id)
+        .limit(1)
+        .scalar_subquery()
+    )
+    stmt = (
+        select(Memory.id, Memory.space_id, Memory.created_at, first_image.label("image_url"))
+        .join(Membership, Membership.space_id == Memory.space_id)
+        .where(
+            Membership.user_id == current_user.id,
+            Memory.created_at > cutoff,
+            Memory.created_at <= now,
+        )
+        .order_by(Memory.created_at.asc(), Memory.id.asc())
+    )
+    rows = (await db.execute(stmt)).all()
+    return RecentSpaceMemoriesOut(
+        server_time=now,
+        memories=[
+            RecentSpaceMemoryOut(
+                id=row.id,
+                space_id=row.space_id,
+                created_at=row.created_at,
+                image_url=row.image_url,
+            )
+            for row in rows
+        ],
+    )
+
+
 @router.get("/feed", response_model=List[MemoryOut])
 async def get_home_feed(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=100),
+    before: Optional[uuid.UUID] = None,
 ):
     # Get all spaces user is member of
     user_spaces_subq = select(Membership.space_id).where(Membership.user_id == current_user.id).subquery()
@@ -259,9 +301,18 @@ async def get_home_feed(
             selectinload(Memory.media_items),
             selectinload(Memory.notes).selectinload(Note.author)
         )
-        .order_by(Memory.created_at.desc())
-        .limit(50)
     )
+    if before:
+        anchor = await db.scalar(
+            select(Memory)
+            .where(Memory.id == before, Memory.space_id.in_(select(user_spaces_subq)))
+        )
+        if not anchor:
+            raise HTTPException(400, "Invalid memory cursor")
+        from sqlalchemy import tuple_
+        stmt = stmt.where(tuple_(Memory.created_at, Memory.id) <
+                          tuple_(anchor.created_at, anchor.id))
+    stmt = stmt.order_by(Memory.created_at.desc(), Memory.id.desc()).limit(limit)
     results = (await db.execute(stmt)).all()
 
     stats = await memory_stats([m.id for m, _ in results], current_user.id, db)

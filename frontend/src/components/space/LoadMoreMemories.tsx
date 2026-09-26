@@ -13,7 +13,7 @@ export function LoadMoreMemories({ endpoint, memories, onLoad }: { endpoint: str
     try {
       const items = await apiRequest<Memory[]>(`${endpoint}?limit=30&before=${memories.at(-1)!.id}`);
       if (!Array.isArray(items)) throw new Error("Invalid memory response");
-      setDone(items.length < 30); onLoad(items);
+      setDone(items.length < 30 || items.every(item => memories.some(existing => existing.id === item.id))); onLoad(items);
     } catch { setError("Couldn't load more memories."); }
     finally { lock.current = false; setBusy(false); }
   }

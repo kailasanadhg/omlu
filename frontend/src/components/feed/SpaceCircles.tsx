@@ -4,13 +4,16 @@ import React from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Space } from "@/types";
+import type { RecentSpaceMemory } from "@/lib/recentSpaceMemories";
 import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
 interface SpaceCirclesProps {
   spaces: Space[];
+  recentBySpace?: Map<string, RecentSpaceMemory[]>;
+  onOpenRecent?: (space: Space) => void;
 }
 
-export function SpaceCircles({ spaces }: SpaceCirclesProps) {
+export function SpaceCircles({ spaces, recentBySpace, onOpenRecent }: SpaceCirclesProps) {
   return (
     <div className="w-full border-b border-neutral-200 py-3.5 bg-white">
       <div className="flex items-center gap-4 overflow-x-auto px-4 scrollbar-none select-none">
@@ -29,33 +32,30 @@ export function SpaceCircles({ spaces }: SpaceCirclesProps) {
 
         {/* Existing Spaces */}
         {spaces.map((space) => {
-          const cover = space.cover_url ? getOptimizedImageUrl(space.cover_url, "avatar") : null;
+          const recent = recentBySpace?.get(space.id) ?? [];
+          const cover = recent.length > 0 && recent.at(-1)?.image_url
+            ? getOptimizedImageUrl(recent.at(-1)?.image_url, "avatar")
+            : space.cover_url ? getOptimizedImageUrl(space.cover_url, "avatar") : null;
           const initials = space.name.slice(0, 2).toUpperCase();
 
-          return (
-            <Link
-              key={space.id}
-              href={`/spaces/${space.id}`}
-              className="flex flex-col items-center gap-1.5 shrink-0 group focus:outline-none"
-            >
-              <div className="w-16 h-16 rounded-full p-0.5 ring-2 ring-neutral-300 group-hover:ring-black transition-all">
-                <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center text-white font-bold text-sm">
-                  {cover ? (
-                    <img
-                      src={cover}
-                      alt={space.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span>{initials}</span>
-                  )}
-                </div>
+          const circle = (
+            <div className={`w-16 h-16 rounded-full p-0.5 ring-2 transition-all ${recent.length > 0 ? "ring-black group-hover:ring-[3px]" : "ring-neutral-300 group-hover:ring-black"}`}>
+              <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center text-white font-bold text-sm">
+                {cover ? <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" /> : <span>{initials}</span>}
               </div>
-              <span className="text-xs font-medium text-neutral-800 truncate w-16 text-center">
+            </div>
+          );
+          return (
+            <div key={space.id} className="flex flex-col items-center gap-1.5 shrink-0 group">
+              {recent.length > 0 && onOpenRecent ? (
+                <button type="button" onClick={() => onOpenRecent(space)} aria-label={`View ${recent.length} recent ${recent.length === 1 ? "memory" : "memories"} in ${space.name}`} className="focus:outline-none focus-visible:outline-2 rounded-full">
+                  {circle}
+                </button>
+              ) : <Link href={`/spaces/${space.id}`} aria-label={`Open ${space.name}`} className="focus:outline-none focus-visible:outline-2 rounded-full">{circle}</Link>}
+              <Link href={`/spaces/${space.id}`} className="text-xs font-medium text-neutral-800 truncate w-16 text-center hover:underline" title={`View full ${space.name} Space`}>
                 {space.name}
-              </span>
-            </Link>
+              </Link>
+            </div>
           );
         })}
       </div>
