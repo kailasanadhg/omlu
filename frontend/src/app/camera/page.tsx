@@ -6,6 +6,7 @@ import { X, SwitchCamera, AlertCircle, Sparkles, CheckCircle2, RotateCw } from "
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/api";
 import { Space } from "@/types";
+import { PrototypeFormat, prototypeFormats, prototypeAspectRatio } from "@/lib/presentationPrototype";
 import {
   enqueueDrop,
   subscribeToPendingDrops,
@@ -30,6 +31,7 @@ function LiveCameraView() {
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [previewFormat, setPreviewFormat] = useState<PrototypeFormat>("3:4");
 
   // Shutter & feedback state
   const [flash, setFlash] = useState(false);
@@ -360,7 +362,10 @@ function LiveCameraView() {
 
       {/* 2. FLOATING VIEWFINDER */}
       <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 flex items-center justify-center relative min-h-0">
-        <div className="relative w-full aspect-[3/4] max-h-full rounded-3xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center">
+        <div
+          className={`relative max-w-full shrink-0 overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center ${previewFormat === "circle" ? "rounded-full" : "rounded-3xl"}`}
+          style={{ aspectRatio: prototypeAspectRatio(previewFormat), width: `min(100%, calc((100dvh - 275px) * ${prototypeAspectRatio(previewFormat)}))` }}
+        >
           {/* Live Video Element - ALWAYS MOUNTED to prevent race condition */}
           <video
             ref={(el) => {
@@ -438,7 +443,20 @@ function LiveCameraView() {
       </main>
 
       {/* 3. CAPTURE CONTROLS & DYNAMIC STATUS */}
-      <footer className="w-full max-w-md mx-auto px-4 pt-2 pb-8 flex flex-col items-center gap-4 z-20">
+      <footer className="w-full max-w-md mx-auto px-4 pt-2 pb-8 flex flex-col items-center gap-3 z-20">
+        <div className="w-full" aria-label="Presentation preview format">
+          <p className="text-center text-[11px] text-white/65 mb-2">Presentation preview · original photo is still uploaded</p>
+          <div className="flex justify-center gap-2">
+            {prototypeFormats.map((format) => <button
+              key={format}
+              type="button"
+              onClick={() => setPreviewFormat(format)}
+              aria-label={`Preview ${format === "circle" ? "circle" : format} format`}
+              aria-pressed={previewFormat === format}
+              className={`min-w-12 h-9 px-2 rounded-full border text-xs font-semibold transition-colors ${previewFormat === format ? "bg-white text-black border-white" : "text-white border-white/40 bg-white/10"}`}
+            >{format === "circle" ? "○" : format}</button>)}
+          </div>
+        </div>
         {/* Controls Bar: Preview Thumbnail + Shutter Button */}
         <div className="w-full flex items-center justify-between px-6">
           {/* Left: Immediate Local Captured Preview */}

@@ -58,11 +58,14 @@ select:-webkit-autofill:focus {
 
 
 :focus-visible { outline: 2px solid #171717; outline-offset: 4px; }
-.memory-masonry { columns: 2; column-gap: 12px; padding: 16px; }
-.memory-tile { break-inside: avoid; margin-bottom: 20px; }
-@media (min-width: 640px) { .memory-masonry { columns: 3; column-gap: 18px; padding: 24px; } }
-@media (min-width: 1024px) { .memory-masonry { columns: 4; } }
-@media (min-width: 1280px) { .memory-masonry { columns: 5; } }
-@media (min-width: 1536px) { .memory-masonry { columns: 6; } }
+/* Mixed-shape visual wall prototype. Presentation only; no stored crop or schema. */
+.memory-masonry { columns: 2; column-gap: 10px; padding: 14px 12px 28px; background: #faf8f3; }
+.memory-tile { break-inside: avoid; margin-bottom: 14px; display: inline-block; width: 100%; vertical-align: top; }
+.memory-tile-photo { overflow: hidden; }
+.memory-tile--circle .memory-tile-photo { width: 90%; margin-inline: auto; border-radius: 50%; }
+.memory-tile--circle > div:last-child { padding-inline: 5%; }
+@media (min-width: 640px) { .memory-masonry { columns: 3; column-gap: 16px; padding: 22px; } .memory-tile { margin-bottom: 20px; } }
+@media (min-width: 1024px) { .memory-masonry { columns: 4; column-gap: 20px; padding: 28px; } }
+@media (min-width: 1440px) { .memory-masonry { columns: 5; } }
 .memory-dialog { margin: auto; width: min(760px, 95vw); max-height: 90dvh; padding: 0; border: 0; border-radius: 12px; }
 .memory-dialog::backdrop { background: rgb(0 0 0 / .75); }
